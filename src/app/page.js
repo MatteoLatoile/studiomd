@@ -1,103 +1,201 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { BsFillMegaphoneFill } from "react-icons/bs";
+import { FiCamera } from "react-icons/fi";
+import { MdOutlineLocalMovies } from "react-icons/md";
+import Black from "../../public/affiches/black.png";
+import Fardeau from "../../public/affiches/fardeau.png";
+import Sil from "../../public/affiches/sil.png";
+import Sunshine from "../../public/affiches/sunshine.png";
+import AfficheFilm from "./components/AfficheFilm";
+import ServiceCard from "./components/CardService";
+import Hero from "./components/Hero";
+
+import { motion } from "framer-motion";
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  show: (i = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.6, delay: 0.08 * i, ease: [0.22, 1, 0.36, 1] },
+  }),
+};
+
+const stagger = {
+  hidden: {},
+  show: {
+    transition: {
+      staggerChildren: 0.12,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+const Home = () => {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <motion.div
+      className="bg-[#FDF6E3] pb-28"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <Hero />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+      {/* SERVICES */}
+      <section className="px-4 md:px-20 mt-30">
+        <motion.h3
+          className="text-3xl md:text-4xl font-bold tracking-tight text-noir mb-4"
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, amount: 0.6 }}
+        >
+          Nos <span className="text-[#FFB700]">services</span>
+        </motion.h3>
+
+        <motion.p
+          className="text-lg md:text-sm leading-4 mb-10 text-[#6B6B6B]"
+          variants={fadeUp}
+          custom={1}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, amount: 0.6 }}
+        >
+          De l’équipement au delivery : <br className="hidden sm:block" />
+          un accompagnement complet, fiable et rapide.
+        </motion.p>
+
+        <motion.div
+          className="grid gap-6 md:grid-cols-3"
+          variants={stagger}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, amount: 0.2 }}
+        >
+          <motion.div variants={fadeUp}>
+            <ServiceCard
+              icon={<FiCamera className="text-4xl text-noir" />}
+              title="Location d’équipement"
+              description={
+                <div>
+                  Matériel professionnel haut de gamme pour tous vos projets
+                  cinématographiques :
+                  <ul className="mt-2 list-disc list-inside">
+                    <li>Caméra 4K</li>
+                    <li>Matériel audio</li>
+                    <li>Éclairage professionnel</li>
+                  </ul>
+                </div>
+              }
+              ctaLabel="Voir le catalogue"
+              href="/catalogue"
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+          </motion.div>
+
+          <motion.div variants={fadeUp} custom={1}>
+            <ServiceCard
+              icon={<MdOutlineLocalMovies className="text-4xl text-noir" />}
+              title="Production & tournage"
+              description={
+                <div>
+                  Équipes agiles pour pubs, clips, fictions et docs :
+                  <ul className="mt-2 list-disc list-inside">
+                    <li>Réalisation & cadre</li>
+                    <li>Son & lumière</li>
+                    <li>Assistanat & DIT</li>
+                  </ul>
+                </div>
+              }
+              ctaLabel="Voir les packs"
+              href="/catalogue"
+            />
+          </motion.div>
+
+          <motion.div variants={fadeUp} custom={2}>
+            <ServiceCard
+              icon={<BsFillMegaphoneFill className="text-4xl text-noir" />}
+              title="Post-prod & delivery"
+              description={
+                <div>
+                  Montage, étalonnage, mixage, exports conformes :
+                  <ul className="mt-2 list-disc list-inside">
+                    <li>Color grading</li>
+                    <li>Sound design</li>
+                    <li>Mastering & DCP</li>
+                  </ul>
+                </div>
+              }
+              ctaLabel="Discuter d’un devis"
+              href="/catalogue"
+            />
+          </motion.div>
+        </motion.div>
+      </section>
+
+      {/* PRODUCTIONS */}
+      <section className="px-4 md:px-20 mt-30">
+        <motion.h3
+          className="text-3xl md:text-4xl  font-bold tracking-tight text-noir mb-4"
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, amount: 0.6 }}
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+          Nos <span className="text-[#FFB700]">productions</span>
+        </motion.h3>
+
+        <motion.p
+          className="text-lg md:text-sm leading-4 mb-10 text-[#6B6B6B]"
+          variants={fadeUp}
+          custom={1}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, amount: 0.6 }}
         >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+          Découvrez une sélection de nos productions : films, clips et projets{" "}
+          <br />
+          audiovisuels réalisés avec nos équipes et nos partenaires. <br />
+          Entre créativité et exigence technique, <br /> chaque projet reflète
+          notre savoir-faire et notre passion pour l’image.
+        </motion.p>
+
+        <motion.div
+          className="flex p-10 flex-col md:flex-row justify-center gap-8 m-auto"
+          variants={stagger}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, amount: 0.15 }}
         >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
+          {/* PAS de motion.div ici */}
+          <AfficheFilm
+            href="/fardeau"
+            affiche={Fardeau}
+            film="FARDEAU"
+            auteur="Naïl Bouhamadi"
           />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          <AfficheFilm
+            href="/you_are_my_sunshine"
+            affiche={Sunshine}
+            film="You Are My Sunshine"
+            auteur="Preiya Dovel"
+          />
+          <AfficheFilm
+            href="/silhouette"
+            affiche={Sil}
+            film="Silhouette"
+            auteur="Kendrick Courant"
+          />
+          <AfficheFilm
+            href="/black_case"
+            affiche={Black}
+            film="Black Case"
+            auteur="Julien Bompart"
+          />
+        </motion.div>
+      </section>
+    </motion.div>
   );
-}
+};
+
+export default Home;
