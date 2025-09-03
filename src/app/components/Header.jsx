@@ -6,25 +6,43 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   FiChevronDown,
+  FiLogOut,
   FiMenu,
   FiSearch,
   FiShoppingCart,
+  FiUser,
   FiX,
 } from "react-icons/fi";
 import Logo from "../../../public/logo.webp";
+import { supabase } from "../lib/supabase";
 
 const Header = () => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [user, setUser] = useState(null);
 
-  // --- visibilité contrôlée par le scroll uniquement sur la home
   const pathname = usePathname();
   const isHome = pathname === "/";
-  const [visible, setVisible] = useState(!isHome); // visible direct sur toutes les pages sauf home
+  const [visible, setVisible] = useState(!isHome);
   const ticking = useRef(false);
 
   useEffect(() => {
-    if (!isHome) return; // pas de logique scroll hors home
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
 
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user || null);
+      }
+    );
+
+    return () => {
+      listener?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isHome) return;
     const onScroll = () => {
       if (ticking.current) return;
       ticking.current = true;
@@ -32,14 +50,11 @@ const Header = () => {
         const y = window.scrollY || 0;
         const vh = window.innerHeight || 0;
         const shouldShow = y >= vh - 1;
-        setVisible(shouldShow || menuOpen); // si menu ouvert, visible de force
+        setVisible(shouldShow || menuOpen);
         ticking.current = false;
       });
     };
-
-    // initial check (si on arrive ancré plus bas)
     onScroll();
-
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
     return () => {
@@ -48,25 +63,23 @@ const Header = () => {
     };
   }, [isHome, menuOpen]);
 
-  // si on ouvre le menu, on force visible (utile sur home quand top)
   useEffect(() => {
     if (!isHome) return;
     if (menuOpen) setVisible(true);
   }, [menuOpen, isHome]);
 
+  const isAdmin = !!user?.app_metadata?.is_admin;
+
   return (
     <header
       className={[
         "fixed top-0 inset-x-0 z-[60]",
-        // style & blur quand visible
         "backdrop-blur supports-[backdrop-filter]:bg-[#ffffff80] bg-[#FDF6E3]/95",
-        // petite anim classe
         "transition-all duration-300",
         visible
           ? "opacity-100 translate-y-0 shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
           : "opacity-0 -translate-y-3 pointer-events-none",
       ].join(" ")}
-      // role bannière
       role="banner"
     >
       <div className="mx-auto max-w-7xl px-4 md:px-6 flex items-center justify-between gap-4 relative py-3">
@@ -87,7 +100,6 @@ const Header = () => {
               Accueil
             </Link>
 
-            {/* Services + dropdown stylé */}
             <div className="relative group">
               <button
                 className="flex items-center gap-1 text-noir/60 hover:text-noir font-medium"
@@ -99,25 +111,11 @@ const Header = () => {
               </button>
 
               <div
-                className="
-                  absolute left-0 top-full w-64 z-30
-                  opacity-0 translate-y-1 scale-95 pointer-events-none
-                  group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-hover:pointer-events-auto
-                  transition-all duration-150 origin-top
-                "
+                className="absolute left-0 top-full w-64 z-30 opacity-0 translate-y-1 scale-95 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-hover:pointer-events-auto transition-all duration-150 origin-top"
                 role="menu"
               >
-                <div
-                  className="
-                    relative rounded-2xl overflow-hidden
-                    bg-white/90 backdrop-blur-md
-                    ring-1 ring-black/5 border border-[#F5E8C7]
-                    shadow-[0_10px_30px_rgba(0,0,0,0.08)]
-                    p-2
-                  "
-                >
+                <div className="relative rounded-2xl overflow-hidden bg-white/90 backdrop-blur-md ring-1 ring-black/5 border border-[#F5E8C7] shadow-[0_10px_30px_rgba(0,0,0,0.08)] p-2">
                   <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FFB700] to-[#FFEB83]" />
-
                   <ul className="pt-3">
                     <li>
                       <Link
@@ -156,10 +154,19 @@ const Header = () => {
             <Link href="/contact" className="text-noir/60 hover:text-noir">
               Contact
             </Link>
+
+            {isAdmin && (
+              <Link
+                href="/dashboard"
+                className="text-noir/80 hover:text-noir font-medium"
+              >
+                Dashboard
+              </Link>
+            )}
           </nav>
         </div>
 
-        {/* Centre : search (masqué en mobile) */}
+        {/* Centre : recherche */}
         <form
           className="hidden md:flex mx-auto flex-1 justify-center"
           role="search"
@@ -183,19 +190,48 @@ const Header = () => {
           >
             <FiShoppingCart className="text-jaune text-xl" />
           </Link>
-
-          <Link
-            href="/connexion"
-            className="hidden sm:inline-flex items-center rounded-2xl px-10 py-4 text-sm font-medium text-noir shadow hover:opacity-90 transition"
-            style={{
-              background:
-                "linear-gradient(90deg, rgba(255,193,25,1) 49%, rgba(255,235,131,1) 100%)",
-            }}
-          >
-            Connexion
-          </Link>
-
-          {/* Burger mobile */}
+          {user ? (
+            <div className="relative group">
+              <button
+                className="p-2 rounded-full hover:bg-blancCasse/60 transition relative"
+                aria-label="Compte utilisateur"
+              >
+                <FiUser className="text-2xl text-noir" />
+              </button>
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg opacity-0 group-hover:opacity-100 group-hover:translate-y-1 transition-all duration-200 z-50 pointer-events-auto">
+                {isAdmin && (
+                  <Link
+                    href="/dashboard"
+                    className="flex items-center gap-2 w-full px-4 py-3 text-sm text-noir hover:bg-[#FDF6E3] hover:ring-1 hover:ring-[#FFEB83]/70 rounded-lg transition"
+                  >
+                    <span className="flex-1 text-left">Dashboard</span>
+                  </Link>
+                )}
+                <button
+                  className="flex items-center gap-2 w-full px-4 py-3 text-sm text-noir hover:bg-[#FDF6E3] hover:ring-1 hover:ring-[#FFEB83]/70 rounded-lg transition"
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                    window.location.reload();
+                  }}
+                >
+                  <FiX className="text-lg" />
+                  <span className="flex-1 text-left">Déconnexion</span>
+                  <FiLogOut className="text-base text-jaune" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <Link
+              href="/connexion"
+              className="hidden sm:inline-flex items-center rounded-2xl px-10 py-4 text-sm font-medium text-noir shadow hover:opacity-90 transition"
+              style={{
+                background:
+                  "linear-gradient(90deg, rgba(255,193,25,1) 49%, rgba(255,235,131,1) 100%)",
+              }}
+            >
+              Connexion
+            </Link>
+          )}
           <button
             className="md:hidden p-2 text-noir"
             onClick={() => setMenuOpen(true)}
@@ -206,19 +242,16 @@ const Header = () => {
         </div>
       </div>
 
-      {/* Offcanvas menu mobile */}
+      {/* Menu mobile */}
       <div
         className={`fixed inset-0 z-[70] transform ${
           menuOpen ? "translate-x-0" : "translate-x-full"
         } transition-transform duration-300 ease-in-out`}
       >
-        {/* Overlay */}
         <div
           className="absolute inset-0 bg-black/40 backdrop-blur-sm"
           onClick={() => setMenuOpen(false)}
         ></div>
-
-        {/* Panel */}
         <div className="absolute right-0 top-0 h-full w-72 bg-[#FDF6E3] shadow-lg flex flex-col p-6">
           <div className="flex justify-between items-center mb-6">
             <Image src={Logo} alt="Studio Mont d'Or" className="h-8 w-auto" />
@@ -229,12 +262,10 @@ const Header = () => {
               <FiX className="text-2xl text-noir" />
             </button>
           </div>
-
           <nav className="flex flex-col gap-4 text-noir text-base font-medium">
             <Link href="/" onClick={() => setMenuOpen(false)}>
               Accueil
             </Link>
-
             <details className="group">
               <summary className="flex items-center justify-between cursor-pointer">
                 Services{" "}
@@ -261,27 +292,46 @@ const Header = () => {
                 </Link>
               </div>
             </details>
-
             <Link href="/a-propos" onClick={() => setMenuOpen(false)}>
               à propos
             </Link>
             <Link href="/contact" onClick={() => setMenuOpen(false)}>
               Contact
             </Link>
+            {isAdmin && (
+              <Link href="/dashboard" onClick={() => setMenuOpen(false)}>
+                Dashboard
+              </Link>
+            )}
           </nav>
-
           <div className="mt-auto">
-            <Link
-              href="/connexion"
-              className="w-full inline-flex items-center justify-center rounded-2xl px-10 py-3 text-sm font-medium text-noir shadow hover:opacity-90 transition"
-              style={{
-                background:
-                  "linear-gradient(90deg, rgba(255,193,25,1) 49%, rgba(255,235,131,1) 100%)",
-              }}
-              onClick={() => setMenuOpen(false)}
-            >
-              Connexion
-            </Link>
+            {user ? (
+              <button
+                className="w-full inline-flex items-center justify-center rounded-2xl px-10 py-3 text-sm font-medium text-noir shadow hover:opacity-90 transition"
+                style={{
+                  background:
+                    "linear-gradient(90deg, rgba(255,193,25,1) 49%, rgba(255,235,131,1) 100%)",
+                }}
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  window.location.reload();
+                }}
+              >
+                Déconnexion
+              </button>
+            ) : (
+              <Link
+                href="/connexion"
+                className="w-full inline-flex items-center justify-center rounded-2xl px-10 py-3 text-sm font-medium text-noir shadow hover:opacity-90 transition"
+                style={{
+                  background:
+                    "linear-gradient(90deg, rgba(255,193,25,1) 49%, rgba(255,235,131,1) 100%)",
+                }}
+                onClick={() => setMenuOpen(false)}
+              >
+                Connexion
+              </Link>
+            )}
           </div>
         </div>
       </div>

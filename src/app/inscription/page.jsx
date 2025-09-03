@@ -49,9 +49,7 @@ export default function InscriptionPage() {
       email: form.email,
       password: form.password,
       options: {
-        data: {
-          name: form.name,
-        },
+        data: { name: form.name },
       },
     });
 

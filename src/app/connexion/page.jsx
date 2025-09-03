@@ -26,7 +26,6 @@ export default function ConnexionPage() {
       setError("E-mail invalide");
       return;
     }
-
     if (!form.password) {
       setError("Mot de passe requis");
       return;
