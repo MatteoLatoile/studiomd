@@ -46,19 +46,35 @@ export default function ContactPage() {
     if (Object.keys(err).length) return;
 
     setSending(true);
-    // 👉 Ici, remplace le setTimeout par ton appel API/email (sendgrid, formspree, route API Next…)
-    await new Promise((r) => setTimeout(r, 1200));
-    setSending(false);
-    setSent(true);
-    setForm({
-      name: "",
-      email: "",
-      phone: "",
-      subject: "",
-      message: "",
-      consent: true,
-    });
-    setTimeout(() => setSent(false), 3000);
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+
+      // succès
+      setSent(true);
+      setForm({
+        name: "",
+        email: "",
+        phone: "",
+        subject: "",
+        message: "",
+        consent: true,
+      });
+      setErrors({});
+      setTimeout(() => setSent(false), 3000);
+    } catch (e) {
+      setErrors((prev) => ({ ...prev, submit: e.message || "Erreur d’envoi" }));
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -173,6 +189,9 @@ export default function ContactPage() {
                   <span className="ml-3 text-sm text-green-700">
                     Merci ! Votre message a bien été envoyé.
                   </span>
+                )}
+                {errors.submit && (
+                  <p className="mt-2 text-sm text-red-600">{errors.submit}</p>
                 )}
               </div>
             </form>

@@ -127,7 +127,7 @@ const Home = () => {
                 </div>
               }
               ctaLabel="Discuter d’un devis"
-              href="/catalogue"
+              href="/location"
             />
           </motion.div>
         </motion.div>
