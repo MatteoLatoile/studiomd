@@ -2,23 +2,57 @@
 
 import { LazyMotion, domAnimation, m, useReducedMotion } from "framer-motion";
 import Image from "next/image";
+import { useState } from "react";
 import { FiArrowRight, FiCalendar, FiMapPin, FiSearch } from "react-icons/fi";
 import ImageHero from "../../../public/imge_hero.png";
 
 const ease = [0.22, 1, 0.36, 1];
 
+// petit composant Skeleton avec shimmer
+function Skel({ className = "" }) {
+  return (
+    <div
+      className={`relative overflow-hidden rounded-md bg-white/15 ${className}`}
+      aria-hidden
+    >
+      <div className="absolute inset-0 -translate-x-full animate-[skel_1.4s_infinite] bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+      <style jsx>{`
+        @keyframes skel {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 const Hero = () => {
   const reduce = useReducedMotion();
-  const today = new Date().toISOString().split("T")[0]; // min pour les dates
+  const today = new Date().toISOString().split("T")[0];
+  const [imgReady, setImgReady] = useState(false);
 
   return (
-    <section className="relative h-screen w-full overflow-hidden bg-sable">
+    <section
+      className="relative h-screen w-full overflow-hidden bg-sable"
+      aria-busy={!imgReady}
+      aria-live="polite"
+    >
       <LazyMotion features={domAnimation}>
-        {/* Image de fond – ANIME UNE FOIS (scale subtle) */}
+        {/* BACKGROUND */}
         <m.div
           className="absolute inset-0 will-change-transform transform-gpu"
           initial={reduce ? false : { scale: 1.08, opacity: 0.9 }}
-          animate={reduce ? false : { scale: 1.02, opacity: 1 }}
+          animate={
+            reduce
+              ? false
+              : imgReady
+              ? { scale: 1.02, opacity: 1 }
+              : { scale: 1.08, opacity: 0.9 }
+          }
           transition={{ duration: 1.1, ease }}
         >
           <Image
@@ -28,8 +62,9 @@ const Hero = () => {
             priority
             sizes="100vw"
             className="object-cover"
+            onLoadingComplete={() => setImgReady(true)}
           />
-          {/* Vignette statique (zéro calcul runtime) */}
+          {/* Vignette */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
@@ -39,11 +74,10 @@ const Hero = () => {
           />
         </m.div>
 
-        {/* Overlay brutaliste (STATIQUE) */}
+        {/* Overlay brut */}
         <div
           aria-hidden
-          className="absolute 
-            inset-0 mix-blend-multiply"
+          className="absolute inset-0 mix-blend-multiply"
           style={{
             background:
               "linear-gradient(360deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.45) 70%, rgba(0,0,0,0.7) 100%)",
@@ -51,19 +85,55 @@ const Hero = () => {
           }}
         />
 
-        {/* Contenu */}
-        <div className="absolute inset-0 flex items-center justify-start px-6 md:px-20 z-10">
-          <m.div
-            className="max-w-xl space-y-6 p-8"
-            initial={reduce ? false : { opacity: 0, y: 22 }}
-            animate={reduce ? false : { opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease, delay: 0.15 }}
-          >
+        {/* SKELETON (visible tant que l'image n'est pas prête) */}
+        {!imgReady && (
+          <div className="absolute inset-0 z-20 px-6 md:px-20 flex items-center">
+            <div className="max-w-xl w-full space-y-6">
+              <Skel className="h-3 w-48 rounded-full" />
+              <Skel className="h-8 w-4/5 rounded-md" />
+              <Skel className="h-3 w-2/3 rounded-full" />
+
+              <div className="rounded-2xl p-5 bg-white/10 backdrop-blur-[2px] border border-white/20 space-y-4">
+                <Skel className="h-4 w-24 rounded" />
+                <div className="grid grid-cols-2 gap-3">
+                  <Skel className="h-9 col-span-2 rounded-lg" />
+                  <Skel className="h-9 rounded-lg" />
+                  <Skel className="h-9 rounded-lg" />
+                  <Skel className="h-10 col-span-2 rounded-lg" />
+                </div>
+                <Skel className="h-3 w-48 rounded-full mx-auto" />
+                <Skel className="h-11 w-full rounded-xl" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CONTENU (crossfade quand l'image est prête) */}
+        <m.div
+          className="absolute inset-0 flex items-center justify-start px-6 md:px-20 z-10"
+          initial={reduce ? false : { opacity: 0, y: 22 }}
+          animate={
+            reduce
+              ? false
+              : imgReady
+              ? { opacity: 1, y: 0 }
+              : { opacity: 0, y: 22 }
+          }
+          transition={{ duration: 0.5, ease, delay: 0.05 }}
+          style={{ pointerEvents: imgReady ? "auto" : "none" }}
+        >
+          <div className="max-w-xl space-y-6 p-8">
             <m.p
               className="text-gray-300 mb-3 text-sm uppercase tracking-wider"
               initial={reduce ? false : { opacity: 0, y: 10 }}
-              animate={reduce ? false : { opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, ease, delay: 0.2 }}
+              animate={
+                reduce
+                  ? false
+                  : imgReady
+                  ? { opacity: 1, y: 0 }
+                  : { opacity: 0, y: 10 }
+              }
+              transition={{ duration: 0.5, ease, delay: 0.1 }}
             >
               Location audiovisuelle pro
             </m.p>
@@ -71,8 +141,14 @@ const Hero = () => {
             <m.h1
               className="text-4xl md:text-5xl tracking-tighter leading-11 font-bold text-white"
               initial={reduce ? false : { opacity: 0, y: 10 }}
-              animate={reduce ? false : { opacity: 1, y: 0 }}
-              transition={{ duration: 0.55, ease, delay: 0.28 }}
+              animate={
+                reduce
+                  ? false
+                  : imgReady
+                  ? { opacity: 1, y: 0 }
+                  : { opacity: 0, y: 10 }
+              }
+              transition={{ duration: 0.55, ease, delay: 0.18 }}
             >
               Loue le bon matériel, <br /> au bon moment.
             </m.h1>
@@ -80,14 +156,20 @@ const Hero = () => {
             <m.p
               className="text-gray-300 mt-4 tracking-tight"
               initial={reduce ? false : { opacity: 0, y: 10 }}
-              animate={reduce ? false : { opacity: 1, y: 0 }}
-              transition={{ duration: 0.55, ease, delay: 0.36 }}
+              animate={
+                reduce
+                  ? false
+                  : imgReady
+                  ? { opacity: 1, y: 0 }
+                  : { opacity: 0, y: 10 }
+              }
+              transition={{ duration: 0.55, ease, delay: 0.26 }}
             >
               Réservation simple, retrait rapide, packs <br /> optimisés pour le
               tournage.
             </m.p>
 
-            {/* Carte recherche – inputs propres */}
+            {/* Carte recherche */}
             <m.div
               className="rounded-2xl p-5 bg-[#FFFFFF70] backdrop-blur-sm shadow-md border-2 border-white space-y-4 max-w-md"
               whileHover={reduce ? undefined : { y: -2 }}
@@ -167,16 +249,16 @@ const Hero = () => {
                 Voir le catalogue <FiArrowRight className="text-lg" />
               </m.button>
             </m.div>
-          </m.div>
-        </div>
+          </div>
+        </m.div>
 
-        {/* Cue scroll (léger) */}
-        {!reduce && (
+        {/* Cue scroll */}
+        {!reduce && imgReady && (
           <m.div
             className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.9, duration: 0.5 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
           >
             <div className="h-10 w-[2px] bg-white/50 overflow-hidden rounded-full">
               <m.span

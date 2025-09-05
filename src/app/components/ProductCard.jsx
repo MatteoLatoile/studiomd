@@ -1,4 +1,5 @@
-import { FiBox, FiShoppingCart } from "react-icons/fi";
+import { FiBox } from "react-icons/fi";
+import AddToCartButton from "./AddToCartButton";
 import DeleteProductButton from "./DeleteProductButton";
 import EditProductButton from "./EditProductButton";
 
@@ -58,14 +59,7 @@ export default function ProductCard({
         <span className="text-[#FFB700]">/jour</span>
       </p>
 
-      <button
-        className="w-full flex items-center justify-center gap-2 py-2 rounded-lg font-semibold text-noir shadow-md text-sm hover:opacity-90 transition cursor-pointer"
-        style={{
-          background: "linear-gradient(90deg,#FFC119 0%, #FFEB83 100%)",
-        }}
-      >
-        Ajouter <FiShoppingCart />
-      </button>
+      <AddToCartButton productId={product.id} />
     </div>
   );
 }

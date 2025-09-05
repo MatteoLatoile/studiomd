@@ -55,7 +55,7 @@ const Home = () => {
         </motion.h3>
 
         <motion.p
-          className="text-lg md:text-sm leading-4 mb-10 text-[#6B6B6B]"
+          className="text-lg md:text-sm leading-4 mb-10 text-[#000]"
           variants={fadeUp}
           custom={1}
           initial="hidden"
@@ -75,7 +75,7 @@ const Home = () => {
         >
           <motion.div variants={fadeUp}>
             <ServiceCard
-              icon={<FiCamera className="text-4xl text-noir" />}
+              icon={<FiCamera className="text-4xl text-[#000]" />}
               title="Location d’équipement"
               description={
                 <div>
@@ -114,7 +114,7 @@ const Home = () => {
 
           <motion.div variants={fadeUp} custom={2}>
             <ServiceCard
-              icon={<BsFillMegaphoneFill className="text-4xl text-noir" />}
+              icon={<BsFillMegaphoneFill className="text-4xl text-[#000]" />}
               title="Post-prod & delivery"
               description={
                 <div>
@@ -136,7 +136,7 @@ const Home = () => {
       {/* PRODUCTIONS */}
       <section className="px-4 md:px-20 mt-30">
         <motion.h3
-          className="text-3xl md:text-4xl  font-bold tracking-tight text-noir mb-4"
+          className="text-3xl md:text-4xl  font-bold tracking-tight text-[#000] mb-4"
           variants={fadeUp}
           initial="hidden"
           whileInView="show"
