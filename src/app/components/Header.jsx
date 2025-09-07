@@ -8,7 +8,6 @@ import {
   FiChevronDown,
   FiLogOut,
   FiMenu,
-  FiSearch,
   FiShoppingCart,
   FiUser,
   FiX,
@@ -31,41 +30,43 @@ export default function Header() {
   const [visible, setVisible] = useState(!isHome);
   const ticking = useRef(false);
 
-  // --------- palette dynamique (PAS de couleurs figées ailleurs) ----------
+  // --------- palette dynamique ----------
   const tone = useMemo(() => {
     if (isDarkPage) {
       return {
         headerBg: "supports-[backdrop-filter]:bg-[#00000099] bg-black/80",
-        link: "text-white/80 hover:text-white",
-        dim: "text-white/60 hover:text-white",
-        searchInput:
-          "bg-[#0F0F14] text-white placeholder:text-white/50 ring-white/10 focus:ring-2 focus:ring-[#FFB700]",
+        link: "text-white hover:text-white", // blanc en dark
+        dim: "text-white/80 hover:text-white",
         dropdownBg: "bg-[#0F0F14]/95 border border-white/10",
         userIcon: "text-white",
         hoverSurface: "hover:bg-white/5",
-        mobilePanel: "bg-[#0F0F14] text-white",
+        mobilePanelBg: "bg-[#0F0F14]",
+        mobilePanelText: "text-white",
       };
     }
     return {
       headerBg: "supports-[backdrop-filter]:bg-[#ffffff80] bg-[#FDF6E3]/95",
-      link: "text-noir/80 hover:text-noir",
-      dim: "text-noir/60 hover:text-noir",
-      searchInput:
-        "bg-white text-noir placeholder:text-gris/80 ring-white/70 shadow-black/10 focus:ring-2 focus:ring-orFonce",
+      link: "text-noir hover:text-noir", // noir en light
+      dim: "text-noir hover:text-noir",
       dropdownBg: "bg-white/90 border border-[#F5E8C7]",
       userIcon: "text-noir",
       hoverSurface: "hover:bg-blancCasse/60",
-      mobilePanel: "bg-[#FDF6E3] text-noir",
+      mobilePanelBg: "bg-[#FDF6E3]",
+      mobilePanelText: "text-noir",
     };
   }, [isDarkPage]);
 
   // --------- util cart ----------
   async function fetchCartCount(uid) {
     if (!uid) return 0;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("cart_items")
       .select("quantity")
       .eq("user_id", uid);
+    if (error) {
+      console.error("[cart] fetch count error:", error.message);
+      return 0;
+    }
     return (data || []).reduce((s, r) => s + (r?.quantity || 0), 0);
   }
 
@@ -95,6 +96,7 @@ export default function Header() {
           .subscribe();
       }
 
+      // Fallback polling (toutes les 10s)
       poll = setInterval(async () => {
         const { data: sess } = await supabase.auth.getUser();
         const uid = sess?.user?.id;
@@ -102,6 +104,13 @@ export default function Header() {
         setCartCount(await fetchCartCount(uid));
       }, 10000);
     })();
+
+    // Écoute manuelle optionnelle (si tu déclenches window.dispatchEvent(new Event("cart:changed")))
+    const onManualChange = async () => {
+      const { data: sess } = await supabase.auth.getUser();
+      setCartCount(await fetchCartCount(sess?.user?.id));
+    };
+    window.addEventListener("cart:changed", onManualChange);
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (_evt, session) => {
@@ -126,12 +135,6 @@ export default function Header() {
         }
       }
     );
-
-    const onManualChange = async () => {
-      const { data: sess } = await supabase.auth.getUser();
-      setCartCount(await fetchCartCount(sess?.user?.id));
-    };
-    window.addEventListener("cart:changed", onManualChange);
 
     return () => {
       listener?.subscription?.unsubscribe();
@@ -173,6 +176,9 @@ export default function Header() {
       ? `Voir le panier (${cartCount} article${cartCount > 1 ? "s" : ""})`
       : "Voir le panier";
 
+  const dropdownItemText = isDarkPage ? "text-white" : "text-noir";
+  const dropdownItemHint = isDarkPage ? "text-white/60" : "text-gris";
+
   return (
     <header
       className={[
@@ -204,7 +210,7 @@ export default function Header() {
 
             <div className="relative group">
               <button
-                className={`flex items-center gap-1 ${tone.dim} font-medium`}
+                className={`flex items-center gap-1 ${tone.link} font-medium`}
                 aria-haspopup="menu"
                 aria-expanded="false"
               >
@@ -224,58 +230,28 @@ export default function Header() {
                     <li>
                       <Link
                         href="/services/location"
-                        className={`flex items-center justify-between w-full px-3 py-2 rounded-xl ${
-                          tone.hoverSurface
-                        } text-sm transition ${
-                          isDarkPage ? "text-white" : "text-noir"
-                        }`}
+                        className={`flex items-center justify-between w-full px-3 py-2 rounded-xl ${tone.hoverSurface} text-sm transition ${dropdownItemText}`}
                       >
                         Location d'équipements{" "}
-                        <span
-                          className={`text-xs ${
-                            isDarkPage ? "text-white/60" : "text-gris"
-                          }`}
-                        >
-                          →
-                        </span>
+                        <span className={`text-xs ${dropdownItemHint}`}>→</span>
                       </Link>
                     </li>
                     <li>
                       <Link
-                        href="/services/production"
-                        className={`flex items-center justify-between w-full px-3 py-2 rounded-xl ${
-                          tone.hoverSurface
-                        } text-sm transition ${
-                          isDarkPage ? "text-white" : "text-noir"
-                        }`}
+                        href="/productions"
+                        className={`flex items-center justify-between w-full px-3 py-2 rounded-xl ${tone.hoverSurface} text-sm transition ${dropdownItemText}`}
                       >
                         Production{" "}
-                        <span
-                          className={`text-xs ${
-                            isDarkPage ? "text-white/60" : "text-gris"
-                          }`}
-                        >
-                          →
-                        </span>
+                        <span className={`text-xs ${dropdownItemHint}`}>→</span>
                       </Link>
                     </li>
                     <li>
                       <Link
                         href="/services/distribution"
-                        className={`flex items-center justify-between w-full px-3 py-2 rounded-xl ${
-                          tone.hoverSurface
-                        } text-sm transition ${
-                          isDarkPage ? "text-white" : "text-noir"
-                        }`}
+                        className={`flex items-center justify-between w-full px-3 py-2 rounded-xl ${tone.hoverSurface} text-sm transition ${dropdownItemText}`}
                       >
                         Distribution de films{" "}
-                        <span
-                          className={`text-xs ${
-                            isDarkPage ? "text-white/60" : "text-gris"
-                          }`}
-                        >
-                          →
-                        </span>
+                        <span className={`text-xs ${dropdownItemHint}`}>→</span>
                       </Link>
                     </li>
                   </ul>
@@ -283,10 +259,10 @@ export default function Header() {
               </div>
             </div>
 
-            <Link href="/a-propos" className={tone.dim}>
+            <Link href="/a-propos" className={tone.link}>
               à propos
             </Link>
-            <Link href="/contact" className={tone.dim}>
+            <Link href="/contact" className={tone.link}>
               Contact
             </Link>
 
@@ -297,21 +273,6 @@ export default function Header() {
             )}
           </nav>
         </div>
-
-        {/* Centre : recherche */}
-        <form
-          className="hidden md:flex mx-auto flex-1 justify-center"
-          role="search"
-        >
-          <div className="relative w-full max-w-xl">
-            <FiSearch className="absolute text-[#FFB700] left-4 top-1/2 -translate-y-1/2 text-lg pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Cherchez une référence ici…"
-              className={`w-full rounded-full pl-11 pr-4 py-3 text-sm outline-none ring-1 ${tone.searchInput}`}
-            />
-          </div>
-        </form>
 
         {/* Droite */}
         <div className="flex items-center gap-4">
@@ -409,11 +370,7 @@ export default function Header() {
           onClick={() => setMenuOpen(false)}
         ></div>
         <div
-          className={`absolute right-0 top-0 h-full w-72 ${tone.mobilePanel
-            .split(" ")
-            .slice(0, 1)} shadow-lg flex flex-col p-6 ${
-            tone.mobilePanel.includes("text-white") ? "text-white" : "text-noir"
-          }`}
+          className={`absolute right-0 top-0 h-full w-72 ${tone.mobilePanelBg} ${tone.mobilePanelText} shadow-lg flex flex-col p-6`}
         >
           <div className="flex justify-between items-center mb-6">
             <Image src={Logo} alt="Studio Mont d'Or" className="h-8 w-auto" />
@@ -425,11 +382,7 @@ export default function Header() {
             </button>
           </div>
           <nav
-            className={`flex flex-col gap-4 ${
-              tone.mobilePanel.includes("text-white")
-                ? "text-white"
-                : "text-noir"
-            } text-base font-medium`}
+            className={`flex flex-col gap-4 ${tone.mobilePanelText} text-base font-medium`}
           >
             <Link href="/" onClick={() => setMenuOpen(false)}>
               Accueil
@@ -448,10 +401,7 @@ export default function Header() {
                 >
                   Location d'équipements
                 </Link>
-                <Link
-                  href="/services/production"
-                  onClick={() => setMenuOpen(false)}
-                >
+                <Link href="/productions" onClick={() => setMenuOpen(false)}>
                   Production
                 </Link>
                 <Link
