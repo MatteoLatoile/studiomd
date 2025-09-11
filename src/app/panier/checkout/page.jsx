@@ -4,17 +4,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
-  FiCalendar,
+  FiCheckCircle,
   FiCreditCard,
+  FiFileText,
   FiHome,
   FiMail,
   FiMapPin,
   FiPhone,
+  FiShield,
   FiTruck,
   FiUser,
-  FiShield,
-  FiFileText,
-  FiCheckCircle,
 } from "react-icons/fi";
 import { supabase } from "../../lib/supabase";
 
@@ -23,19 +22,21 @@ function euro(n) {
   const v = Number(n || 0);
   return v.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 }
-function isoToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString().split("T")[0];
-}
 function daysInclusive(a, b) {
   try {
     const d1 = new Date(a + "T00:00:00");
     const d2 = new Date(b + "T00:00:00");
-    const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+    const diff = Math.round((d2 - d1) / 86400000);
     return Math.max(1, diff + 1);
   } catch {
     return 1;
+  }
+}
+function fmtDate(d) {
+  try {
+    return new Date(d + "T00:00:00").toLocaleDateString("fr-FR");
+  } catch {
+    return d || "—";
   }
 }
 
@@ -43,7 +44,7 @@ export default function CheckoutPage() {
   const router = useRouter();
 
   const [user, setUser] = useState(null);
-  const [items, setItems] = useState([]); // { id, quantity, product:{ id,name,price,image_url,category } }
+  const [items, setItems] = useState([]); // { id, quantity, start_date, end_date, product:{ id,name,price,image_url,category } }
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -54,10 +55,6 @@ export default function CheckoutPage() {
     email: "",
     phone: "",
   });
-
-  // dates
-  const [startDate, setStartDate] = useState(isoToday());
-  const [endDate, setEndDate] = useState(isoToday());
 
   // options
   const [delivery, setDelivery] = useState("pickup"); // "pickup" | "delivery"
@@ -88,13 +85,15 @@ export default function CheckoutPage() {
       }
       setUser(currentUser);
 
-      // Panier
+      // Panier avec DATES PAR ITEM
       const { data: cart, error: cartErr } = await supabase
         .from("cart_items")
         .select(
           `
           id,
           quantity,
+          start_date,
+          end_date,
           product:products(
             id, name, price, image_url, category
           )
@@ -135,22 +134,15 @@ export default function CheckoutPage() {
     };
   }, []);
 
-  /* ---------- dérivés ---------- */
-  const days = useMemo(
-    () => daysInclusive(startDate, endDate),
-    [startDate, endDate]
-  );
+  /* ---------- totaux (par item) ---------- */
+  const subtotal = useMemo(() => {
+    return (items || []).reduce((s, it) => {
+      const price = Number(it?.product?.price) || 0;
+      const days = daysInclusive(it.start_date, it.end_date);
+      return s + price * days * (it.quantity || 0);
+    }, 0);
+  }, [items]);
 
-  const subtotalPerDay = useMemo(
-    () =>
-      (items || []).reduce(
-        (s, it) => s + (Number(it?.product?.price) || 0) * (it?.quantity || 0),
-        0
-      ),
-    [items]
-  );
-
-  const subtotal = useMemo(() => subtotalPerDay * days, [subtotalPerDay, days]);
   const tva = subtotal * 0.2;
   const total = subtotal + tva;
 
@@ -170,23 +162,18 @@ export default function CheckoutPage() {
     if (!form.first_name.trim()) err.first_name = "Prénom requis";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       err.email = "E-mail invalide";
-    // dates
-    if (!startDate) err.startDate = "Date de début requise";
-    if (!endDate) err.endDate = "Date de fin requise";
-    if (new Date(endDate) < new Date(startDate))
-      err.endDate = "Date de fin avant début";
     // adresse si livraison
     if (delivery === "delivery") {
       if (!address.line1.trim()) err.line1 = "Adresse requise";
       if (!address.postal_code.trim()) err.postal_code = "Code postal requis";
       if (!address.city.trim()) err.city = "Ville requise";
     }
+    // dates : plus rien à valider ici → elles viennent du panier
+    // on garde la sécurité côté API (validation + RPC dispo)
     return err;
   }
 
-  // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-  // BRANCHEMENT STRIPE : création de session + redirection
-  // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  // Création de la session Stripe (les dates sont par item côté DB)
   async function onSubmit(e) {
     if (e?.preventDefault) e.preventDefault();
     const err = validate();
@@ -201,8 +188,6 @@ export default function CheckoutPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            startDate,
-            endDate,
             delivery,
             address: delivery === "delivery" ? address : null,
           }),
@@ -213,12 +198,11 @@ export default function CheckoutPage() {
             data?.error || "Impossible de créer la session Stripe"
           );
         }
-        // Redirection vers la page de paiement Stripe
-        window.location.href = data.url;
+        window.location.href = data.url; // redirection vers Stripe
         return;
       }
 
-      // Paiement par virement (sans Stripe)
+      // Paiement par virement (fallback)
       const ref = "RES-" + Math.random().toString(36).slice(2, 8).toUpperCase();
       router.push(
         `/panier/checkout/confirmation?ref=${encodeURIComponent(ref)}`
@@ -318,29 +302,6 @@ export default function CheckoutPage() {
                 placeholder="Numéro de téléphone"
               />
 
-              {/* Dates */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <FieldDate
-                  icon={<FiCalendar className="text-[#FFB700]" />}
-                  label="Date de début"
-                  value={startDate}
-                  onChange={(v) => {
-                    setStartDate(v);
-                    if (new Date(v) > new Date(endDate)) setEndDate(v);
-                  }}
-                  min={isoToday()}
-                  error={errors.startDate}
-                />
-                <FieldDate
-                  icon={<FiCalendar className="text-[#FFB700]" />}
-                  label="Date de fin"
-                  value={endDate}
-                  onChange={setEndDate}
-                  min={startDate || isoToday()}
-                  error={errors.endDate}
-                />
-              </div>
-
               {/* Options & livraison */}
               <div className="pt-2 space-y-3">
                 <h2 className="text-xl font-bold text-noir">
@@ -403,7 +364,7 @@ export default function CheckoutPage() {
                     </div>
                   </label>
 
-                  {/* Bloc adresse (affiché uniquement si sélectionné) */}
+                  {/* Bloc adresse */}
                   <div
                     className={[
                       "grid grid-cols-1 sm:grid-cols-2 gap-3 px-3 pb-3 transition-all",
@@ -470,7 +431,7 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* CTA bas de colonne (mobile) */}
+              {/* CTA mobile */}
               <div className="sm:hidden pt-3">
                 <button
                   type="submit"
@@ -496,39 +457,46 @@ export default function CheckoutPage() {
 
           {/* Liste des produits */}
           <ul className="mt-4 space-y-3">
-            {(items || []).map((it) => (
-              <li
-                key={it.id}
-                className="flex gap-3 items-center bg-white p-3 rounded-xl ring-1 ring-black/5"
-              >
-                <div className="h-16 w-16 shrink-0 rounded-lg overflow-hidden ring-1 ring-black/10 bg-white">
-                  {it.product?.image_url ? (
-                    <img
-                      src={it.product.image_url}
-                      alt={it.product.name}
-                      className="h-full w-full object-contain"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="h-full w-full bg-gray-100" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-noir truncate">
-                    {it.product?.name || "—"}
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    {it.product?.category || "—"}
-                  </p>
-                  <p className="text-xs text-gray-600 mt-0.5">
-                    {days} jour{days > 1 ? "s" : ""} ({startDate} – {endDate})
-                  </p>
-                </div>
-                <div className="text-sm font-semibold">
-                  {Number(it?.product?.price).toFixed(2)}€
-                </div>
-              </li>
-            ))}
+            {(items || []).map((it) => {
+              const unit = Number(it?.product?.price) || 0;
+              const days = daysInclusive(it.start_date, it.end_date);
+              const line = unit * days * (it.quantity || 0);
+              return (
+                <li
+                  key={it.id}
+                  className="flex gap-3 items-center bg-white p-3 rounded-xl ring-1 ring-black/5"
+                >
+                  <div className="h-16 w-16 shrink-0 rounded-lg overflow-hidden ring-1 ring-black/10 bg-white">
+                    {it.product?.image_url ? (
+                      <img
+                        src={it.product.image_url}
+                        alt={it.product.name}
+                        className="h-full w-full object-contain"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="h-full w-full bg-gray-100" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-noir truncate">
+                      {it.product?.name || "—"}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      {it.product?.category || "—"}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      {days} jour{days > 1 ? "s" : ""} —{" "}
+                      {fmtDate(it.start_date)} → {fmtDate(it.end_date)}
+                    </p>
+                    <p className="text-xs text-noir/70">
+                      Quantité: {it.quantity}
+                    </p>
+                  </div>
+                  <div className="text-sm font-semibold">{euro(line)}</div>
+                </li>
+              );
+            })}
           </ul>
 
           {/* Totaux */}
@@ -636,35 +604,12 @@ function FieldPlain({
   );
 }
 
-function FieldDate({ icon, label, value, onChange, min, error }) {
-  return (
-    <div>
-      <label className="text-[13px] text-noir flex items-center gap-2 mb-1">
-        <span className="inline-flex h-5 w-5 items-center justify-center">
-          {icon}
-        </span>
-        {label}
-      </label>
-      <div className="flex items-center gap-2 rounded-lg bg-white border border-gray-300 px-3 py-2 focus-within:border-gray-400 focus-within:ring-2 focus-within:ring-[#FFB700]/30">
-        <input
-          type="date"
-          value={value}
-          min={min}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full text-sm outline-none appearance-none [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:cursor-pointer bg-transparent"
-        />
-      </div>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-    </div>
-  );
-}
-
 function RadioCard({ checked, onChange, title, icon }) {
   return (
     <label
       className={[
         "cursor-pointer rounded-xl p-3 bg-white ring-1 ring-black/10 flex items-center gap-3",
-        checked ? "outline outline-2 outline-[#FFB700]" : "",
+        checked ? " outline-2 outline-[#FFB700]" : "",
       ].join(" ")}
     >
       <input

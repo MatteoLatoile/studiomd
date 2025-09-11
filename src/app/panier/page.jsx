@@ -16,22 +16,36 @@ function euro(n) {
   const v = Number(n || 0);
   return v.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 }
+function daysBetween(startISO, endISO) {
+  if (!startISO || !endISO) return 1;
+  const a = new Date(startISO + "T00:00:00");
+  const b = new Date(endISO + "T00:00:00");
+  const ms = b - a;
+  // inclusif: du 10 au 12 = 3 jours (10,11,12)
+  const d = Math.floor(ms / 86400000) + 1;
+  return Math.max(1, d);
+}
+function fmtDate(d) {
+  try {
+    return new Date(d + "T00:00:00").toLocaleDateString("fr-FR");
+  } catch {
+    return d || "—";
+  }
+}
 
 export default function PanierPage() {
   const [user, setUser] = useState(null);
-  const [items, setItems] = useState([]); // {id, quantity, product:{ id,name,price,image_url,category }}
+  const [items, setItems] = useState([]); // {id, quantity, start_date, end_date, product:{...}}
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
-
     async function load() {
       setLoading(true);
       const {
         data: { user },
       } = await supabase.auth.getUser();
       setUser(user || null);
-
       if (!user) {
         setItems([]);
         setLoading(false);
@@ -44,6 +58,8 @@ export default function PanierPage() {
           `
           id,
           quantity,
+          start_date,
+          end_date,
           product:products(
             id, name, price, image_url, category
           )
@@ -61,27 +77,32 @@ export default function PanierPage() {
       }
       setLoading(false);
     }
-
     load();
+
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       if (!mounted) return;
       setUser(session?.user || null);
     });
 
+    const onChange = () => load();
+    window.addEventListener("cart:changed", onChange);
+
     return () => {
       mounted = false;
       sub?.subscription?.unsubscribe();
+      window.removeEventListener("cart:changed", onChange);
     };
   }, []);
 
-  const subtotal = useMemo(
-    () =>
-      items.reduce(
-        (s, it) => s + (Number(it?.product?.price) || 0) * it.quantity,
-        0
-      ),
-    [items]
-  );
+  // total = sum( price/jour * jours * qty )
+  const subtotal = useMemo(() => {
+    return items.reduce((s, it) => {
+      const price = Number(it?.product?.price) || 0;
+      const days = daysBetween(it.start_date, it.end_date);
+      return s + price * days * it.quantity;
+    }, 0);
+  }, [items]);
+
   const tva = subtotal * 0.2;
   const total = subtotal + tva;
 
@@ -100,6 +121,9 @@ export default function PanierPage() {
   async function removeItem(id) {
     const { error } = await supabase.from("cart_items").delete().eq("id", id);
     if (!error) setItems((prev) => prev.filter((x) => x.id !== id));
+    try {
+      window.dispatchEvent(new Event("cart:changed"));
+    } catch {}
   }
 
   if (loading) {
@@ -141,76 +165,99 @@ export default function PanierPage() {
       <h1 className="text-3xl font-bold text-noir">Mon panier</h1>
 
       <div className="mt-6 grid md:grid-cols-[1fr_360px] gap-6">
-        {/* Liste des items */}
+        {/* Liste items */}
         <section className="rounded-2xl bg-[#ffffffb3] ring-1 ring-black/5 shadow-[0_10px_30px_rgba(0,0,0,0.06)] p-4 sm:p-5">
           {items.length === 0 ? (
             <EmptyCart />
           ) : (
             <ul className="space-y-4">
-              {items.map((it) => (
-                <li
-                  key={it.id}
-                  className="grid grid-cols-[84px_1fr_auto] gap-3 sm:gap-4 items-center rounded-xl bg-white p-3 ring-1 ring-black/5"
-                >
-                  <div className="h-20 w-20 rounded-lg overflow-hidden ring-1 ring-black/10 bg-white">
-                    {it.product?.image_url ? (
-                      <img
-                        src={it.product.image_url}
-                        alt={it.product.name}
-                        className="h-full w-full object-contain"
-                      />
-                    ) : (
-                      <div className="h-full w-full bg-gray-100" />
-                    )}
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="font-semibold text-noir truncate">
-                      {it.product?.name || "—"}
-                    </p>
-                    <p className="text-xs text-gray-600">
-                      {it.product?.category || "—"}
-                    </p>
-                    <p className="text-sm text-noir mt-1">
-                      {Number(it?.product?.price).toFixed(2)}€{" "}
-                      <span className="text-[#FFB700]">/jour</span>
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    {/* stepper quantité */}
-                    <div className="inline-flex items-center rounded-full ring-1 ring-black/10 overflow-hidden bg-white">
-                      <button
-                        className="px-2 py-1 hover:bg-black/5 cursor-pointer"
-                        onClick={() => updateQty(it.id, it.quantity - 1)}
-                        aria-label="Diminuer la quantité"
-                      >
-                        <FiMinus />
-                      </button>
-                      <span className="px-3 select-none text-sm">
-                        {it.quantity}
-                      </span>
-                      <button
-                        className="px-2 py-1 hover:bg-black/5 cursor-pointer"
-                        onClick={() => updateQty(it.id, it.quantity + 1)}
-                        aria-label="Augmenter la quantité"
-                      >
-                        <FiPlus />
-                      </button>
+              {items.map((it) => {
+                const days = daysBetween(it.start_date, it.end_date);
+                const unit = Number(it?.product?.price) || 0;
+                const line = unit * days * it.quantity;
+                return (
+                  <li
+                    key={it.id}
+                    className="grid grid-cols-[84px_1fr_auto] gap-3 sm:gap-4 items-center rounded-xl bg-white p-3 ring-1 ring-black/5"
+                  >
+                    <div className="h-20 w-20 rounded-lg overflow-hidden ring-1 ring-black/10 bg-white">
+                      {it.product?.image_url ? (
+                        <img
+                          src={it.product.image_url}
+                          alt={it.product.name}
+                          className="h-full w-full object-contain"
+                        />
+                      ) : (
+                        <div className="h-full w-full bg-gray-100" />
+                      )}
                     </div>
 
-                    {/* supprimer */}
-                    <button
-                      className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-[#FFF3C4] text-black ring-1 ring-[#FFD978] hover:bg-[#FFE48A] cursor-pointer"
-                      onClick={() => removeItem(it.id)}
-                      aria-label="Retirer du panier"
-                      title="Retirer"
-                    >
-                      <FiTrash2 />
-                    </button>
-                  </div>
-                </li>
-              ))}
+                    <div className="min-w-0">
+                      <p className="font-semibold text-noir truncate">
+                        {it.product?.name || "—"}
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        {it.product?.category || "—"}
+                      </p>
+
+                      <p className="text-xs text-noir/70 mt-1">
+                        {it.start_date ? (
+                          <>
+                            Du <strong>{fmtDate(it.start_date)}</strong> au{" "}
+                            <strong>{fmtDate(it.end_date)}</strong> ({days} jour
+                            {days > 1 ? "s" : ""})
+                          </>
+                        ) : (
+                          "Dates non précisées"
+                        )}
+                      </p>
+
+                      <p className="text-sm text-noir mt-1">
+                        {unit.toFixed(2)}€{" "}
+                        <span className="text-[#FFB700]">/jour</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="inline-flex items-center rounded-full ring-1 ring-black/10 overflow-hidden bg-white">
+                        <button
+                          className="px-2 py-1 hover:bg-black/5 cursor-pointer"
+                          onClick={() => updateQty(it.id, it.quantity - 1)}
+                          aria-label="Diminuer"
+                        >
+                          <FiMinus />
+                        </button>
+                        <span className="px-3 select-none text-sm">
+                          {it.quantity}
+                        </span>
+                        <button
+                          className="px-2 py-1 hover:bg-black/5 cursor-pointer"
+                          onClick={() => updateQty(it.id, it.quantity + 1)}
+                          aria-label="Augmenter"
+                        >
+                          <FiPlus />
+                        </button>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-xs text-noir/60">Ligne</div>
+                        <div className="text-sm font-semibold">
+                          {euro(line)}
+                        </div>
+                      </div>
+
+                      <button
+                        className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-[#FFF3C4] text-black ring-1 ring-[#FFD978] hover:bg-[#FFE48A] cursor-pointer"
+                        onClick={() => removeItem(it.id)}
+                        aria-label="Retirer"
+                        title="Retirer"
+                      >
+                        <FiTrash2 />
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
 
@@ -234,7 +281,7 @@ export default function PanierPage() {
           </h2>
 
           <div className="mt-4 space-y-2 text-sm">
-            <Row label="Subtotal" value={euro(subtotal)} />
+            <Row label="Sous-total" value={euro(subtotal)} />
             <Row label="TVA 20%" value={euro(tva)} />
             <div className="h-[1px] bg-black/10 my-3" />
             <Row label="Total TTC" value={euro(total)} strong />

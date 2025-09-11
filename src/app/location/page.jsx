@@ -13,10 +13,13 @@ export default function LocationPage() {
   const [selectedBrands, setSelectedBrands] = useState([]);
   const [priceRange, setPriceRange] = useState([0, 10000]);
 
+  // 👇 dates de dispo
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
-
   const [user, setUser] = useState(null);
 
   // user => isAdmin
@@ -35,37 +38,55 @@ export default function LocationPage() {
   }, []);
   const isAdmin = !!user?.app_metadata?.is_admin;
 
-  // fetch products
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      setLoading(true);
-      setErr(null);
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, name, description, price, category, image_url, image_path")
-        .order("created_at", { ascending: false });
-      if (!mounted) return;
-      if (error) {
-        setErr(error.message);
-        setProducts([]);
+  // fetch products (RPC si dates choisies)
+  async function loadProducts() {
+    setLoading(true);
+    setErr(null);
+    try {
+      let data, error;
+
+      if (startDate && endDate) {
+        const res = await supabase.rpc("products_available", {
+          p_start: startDate,
+          p_end: endDate,
+        });
+        data = res.data;
+        error = res.error;
       } else {
-        setProducts(data || []);
+        const res = await supabase
+          .from("products")
+          .select(
+            "id, name, description, price, category, image_url, image_path, created_at"
+          )
+          .order("created_at", { ascending: false });
+        data = res.data;
+        error = res.error;
       }
+
+      if (error) throw error;
+      setProducts(data || []);
+    } catch (e) {
+      setErr(e.message || "Erreur de chargement");
+      setProducts([]);
+    } finally {
       setLoading(false);
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    }
+  }
+
+  useEffect(() => {
+    loadProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate, endDate]);
 
   // catégories → filtres + modal
   const allCategories = useMemo(() => {
-    const set = new Set(products.map((p) => p.category).filter(Boolean));
+    const set = new Set(
+      (products || []).map((p) => p.category).filter(Boolean)
+    );
     return Array.from(set).sort();
   }, [products]);
 
-  // filtrage
+  // filtrage client (texte / cat / marque / prix)
   const filtered = useMemo(() => {
     return (products || []).filter((product) => {
       const name = (product.name || "").toLowerCase();
@@ -74,7 +95,7 @@ export default function LocationPage() {
         selectedCategories.length === 0 ||
         selectedCategories.includes(product.category);
       const matchesBrand =
-        selectedBrands.length === 0 || selectedBrands.includes(product.brand);
+        selectedBrands.length === 0 || selectedBrands.includes(product.brand); // (brand si tu l’ajoutes plus tard)
       const price = Number(product.price) || 0;
       const matchesPrice = price >= priceRange[0] && price <= priceRange[1];
       return matchesSearch && matchesCategory && matchesBrand && matchesPrice;
@@ -84,7 +105,7 @@ export default function LocationPage() {
   return (
     <div className="bg-[#FDF6E3] min-h-screen py-30 px-4 md:px-15 relative">
       <h1 className="text-3xl font-bold text-noir">Locations d’équipement</h1>
-      <p className="text-sm tracking-tighter mb-10  text-gray-600 mt-2">
+      <p className="text-sm tracking-tighter mb-10 text-gray-600 mt-2">
         Caméras, optiques, audio, lumière… <br /> tout l’équipement dont vous
         avez besoin, prêt à tourner quand vous l’êtes.
       </p>
@@ -98,6 +119,11 @@ export default function LocationPage() {
           setSelectedBrands={setSelectedBrands}
           priceRange={priceRange}
           setPriceRange={setPriceRange}
+          // 👇 dates
+          startDate={startDate}
+          endDate={endDate}
+          setStartDate={setStartDate}
+          setEndDate={setEndDate}
         />
 
         <div>
@@ -136,7 +162,11 @@ export default function LocationPage() {
 
               {filtered.length === 0 && (
                 <p className="text-sm text-noir/60">
-                  Aucun produit ne correspond à votre recherche.
+                  Aucun produit{" "}
+                  {startDate && endDate
+                    ? "disponible sur ces dates"
+                    : "ne correspond à votre recherche"}
+                  .
                 </p>
               )}
             </div>
@@ -144,7 +174,6 @@ export default function LocationPage() {
         </div>
       </div>
 
-      {/* FAB admin only */}
       <AddProductFAB
         isAdmin={isAdmin}
         categories={allCategories}

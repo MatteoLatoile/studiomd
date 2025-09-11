@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { FiFilter, FiRotateCw, FiX } from "react-icons/fi";
+import { FiCalendar, FiFilter, FiRotateCw, FiX } from "react-icons/fi";
 
 const DEFAULT_CATEGORIES = [
   "Éclairage",
@@ -12,6 +12,12 @@ const DEFAULT_CATEGORIES = [
 ];
 const DEFAULT_BRANDS = ["Canon", "Sony"];
 
+function isoToday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString().split("T")[0];
+}
+
 export default function Filters({
   categories: categoriesProp,
   brands: brandsProp,
@@ -21,8 +27,12 @@ export default function Filters({
   setSelectedBrands,
   priceRange,
   setPriceRange,
+  // 👇 nouveaux props pour la dispo par dates
+  startDate,
+  endDate,
+  setStartDate,
+  setEndDate,
 }) {
-  // listes finales (props > défauts)
   const categories = useMemo(
     () =>
       Array.isArray(categoriesProp) && categoriesProp.length
@@ -53,6 +63,9 @@ export default function Filters({
     setSelectedCategories([]);
     setSelectedBrands([]);
     setPriceRange([MIN_P, MAX_P]);
+    // reset dates
+    setStartDate("");
+    setEndDate("");
   };
 
   // slider min/max
@@ -65,13 +78,14 @@ export default function Filters({
     setPriceRange([priceRange[0], n]);
   };
 
-  // styles pour la “barre remplie” entre les deux valeurs
   const leftPct = ((priceRange[0] - MIN_P) / (MAX_P - MIN_P)) * 100;
   const rightPct = ((priceRange[1] - MIN_P) / (MAX_P - MIN_P)) * 100;
 
+  const today = isoToday();
+  const canEndMin = startDate || today;
+
   return (
     <aside className="sticky top-24 self-start">
-      {/* Carte glass + bordure gradient */}
       <div className="relative rounded-3xl p-[1px] bg-gradient-to-br from-[#FFC119] via-[#FFEB83] to-transparent shadow-[0_12px_40px_rgba(0,0,0,0.12)]">
         <div className="rounded-3xl bg-white/80 backdrop-blur-md ring-1 ring-black/5">
           {/* Header */}
@@ -90,9 +104,26 @@ export default function Filters({
           </div>
 
           {/* Badges sélectionnés */}
-          {(selectedCategories.length > 0 || selectedBrands.length > 0) && (
+          {(selectedCategories.length > 0 ||
+            selectedBrands.length > 0 ||
+            (startDate && endDate)) && (
             <div className="px-5 pt-4 space-y-2">
               <div className="flex flex-wrap gap-2">
+                {startDate && endDate && (
+                  <button
+                    onClick={() => {
+                      setStartDate("");
+                      setEndDate("");
+                    }}
+                    className="group inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium
+                               bg-[#EAFCEC] ring-1 ring-[#B6F3C1]/70 hover:bg-[#D9F7E0] transition cursor-pointer"
+                    title="Retirer le filtre de dates"
+                  >
+                    Dispo: {startDate} → {endDate}
+                    <FiX className="opacity-70 group-hover:opacity-100" />
+                  </button>
+                )}
+
                 {selectedCategories.map((c) => (
                   <button
                     key={`cat-${c}`}
@@ -125,6 +156,42 @@ export default function Filters({
 
           {/* Sections */}
           <div className="px-5 py-5 space-y-8">
+            {/* Disponibilité par dates */}
+            <section>
+              <h3 className="text-sm font-semibold text-noir mb-3 flex items-center gap-2">
+                <FiCalendar className="text-[#FFC119]" />
+                Disponibilité
+              </h3>
+              <div className="grid grid-cols-1 gap-3">
+                <label className="text-[12px] text-noir/80">Début</label>
+                <input
+                  type="date"
+                  value={startDate || ""}
+                  min={today}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setStartDate(v);
+                    if (endDate && v && new Date(endDate) < new Date(v)) {
+                      setEndDate(v);
+                    }
+                  }}
+                  className="w-full text-sm rounded-lg border border-black/10 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-[#FFB700]/30"
+                />
+                <label className="text-[12px] text-noir/80 mt-2">Fin</label>
+                <input
+                  type="date"
+                  value={endDate || ""}
+                  min={canEndMin}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full text-sm rounded-lg border border-black/10 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-[#FFB700]/30"
+                />
+                <p className="text-[11px] text-noir/60">
+                  Seuls les produits disponibles sur toute la plage seront
+                  affichés.
+                </p>
+              </div>
+            </section>
+
             {/* Catégories */}
             <section>
               <h3 className="text-sm font-semibold text-noir mb-3">
@@ -159,7 +226,7 @@ export default function Filters({
               </div>
             </section>
 
-            {/* Marques */}
+            {/* Marques (placeholder si tu ajoutes la donnée plus tard) */}
             <section>
               <h3 className="text-sm font-semibold text-noir mb-3">Marques</h3>
               <div className="flex flex-wrap gap-2">
@@ -197,7 +264,6 @@ export default function Filters({
                 Prix / jour
               </h3>
 
-              {/* Valeurs */}
               <div className="flex items-center justify-between text-xs text-noir/70 mb-2">
                 <div className="inline-flex items-center gap-2">
                   <span className="px-2 py-1 rounded-md bg-white ring-1 ring-black/10">
@@ -231,9 +297,7 @@ export default function Filters({
                 </div>
               </div>
 
-              {/* Double slider simple */}
               <div className="relative pt-4 pb-1">
-                {/* piste */}
                 <div className="h-2 rounded-full bg-white ring-1 ring-black/10 relative">
                   <div
                     className="absolute h-2 rounded-full"
@@ -247,7 +311,6 @@ export default function Filters({
                   />
                 </div>
 
-                {/* input min */}
                 <input
                   type="range"
                   min={MIN_P}
@@ -257,7 +320,6 @@ export default function Filters({
                   className="absolute inset-0 w-full h-2 appearance-none bg-transparent pointer-events-auto"
                   style={{ WebkitAppearance: "none" }}
                 />
-                {/* input max */}
                 <input
                   type="range"
                   min={MIN_P}
@@ -268,8 +330,6 @@ export default function Filters({
                   style={{ WebkitAppearance: "none" }}
                 />
               </div>
-
-              {/* Astuce: on ne touche pas aux thumbs natifs ici pour rester full-Tailwind / no CSS custom */}
             </section>
           </div>
         </div>

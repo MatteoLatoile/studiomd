@@ -1,9 +1,10 @@
-import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { stripe } from "@/app/lib/stripe";
-
 export const dynamic = "force-dynamic";
 
+import { stripe } from "@/app/lib/stripe";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
+
+/** nb de jours (inclusif) entre 2 dates ISO (YYYY-MM-DD) */
 function daysInclusive(a, b) {
   const d1 = new Date(a + "T00:00:00");
   const d2 = new Date(b + "T00:00:00");
@@ -13,6 +14,8 @@ function daysInclusive(a, b) {
 
 export async function POST(req) {
   const supabase = createRouteHandlerClient({ cookies });
+
+  // Auth (admin/clients connectés)
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -21,13 +24,14 @@ export async function POST(req) {
       status: 401,
     });
 
-  const { session_id } = await req.json();
+  // Body
+  const { session_id } = await req.json().catch(() => ({}));
   if (!session_id)
     return new Response(JSON.stringify({ error: "session_id manquant" }), {
       status: 400,
     });
 
-  // Récupère et vérifie la session
+  // Session Stripe
   const session = await stripe.checkout.sessions.retrieve(session_id);
   if (!session || session.payment_status !== "paid") {
     return new Response(JSON.stringify({ error: "Paiement non confirmé" }), {
@@ -35,7 +39,7 @@ export async function POST(req) {
     });
   }
 
-  // Métadonnées
+  // Métadonnées (posées lors de create-session)
   const meta = session.metadata || {};
   const startDate = meta.start_date;
   const endDate = meta.end_date;
@@ -43,11 +47,43 @@ export async function POST(req) {
   const address = JSON.parse(meta.address_json || "{}");
   const days = daysInclusive(startDate, endDate);
 
-  // Panier (join produits)
-  const { data: cart } = await supabase
+  const customer_email =
+    meta.email || session.customer_details?.email || user.email || null;
+  const customer_first_name = meta.first_name || null;
+  const customer_last_name = meta.last_name || null;
+  const customer_phone = meta.phone || session.customer_details?.phone || null;
+
+  // Panier (pour créer les lignes)
+  const { data: cart, error: cartErr } = await supabase
     .from("cart_items")
-    .select(`id, quantity, product:products(id, name, price)`)
+    .select(
+      `id, quantity, start_date, end_date, product:products(id, name, price)`
+    )
     .eq("user_id", user.id);
+
+  if (cartErr) {
+    return new Response(JSON.stringify({ error: cartErr.message }), {
+      status: 400,
+    });
+  }
+
+  // (Option) on peut revalider que tous les items partagent bien le même créneau
+  if (!cart || cart.length === 0) {
+    return new Response(JSON.stringify({ error: "Panier vide" }), {
+      status: 400,
+    });
+  }
+  for (const it of cart) {
+    if (it.start_date !== startDate || it.end_date !== endDate) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "Incohérence des dates dans le panier au moment de la confirmation.",
+        }),
+        { status: 400 }
+      );
+    }
+  }
 
   // Crée la commande
   const { data: order, error: orderErr } = await supabase
@@ -62,6 +98,10 @@ export async function POST(req) {
       payment_method: "card",
       total_amount_cents: session.amount_total || 0,
       status: "paid",
+      customer_email,
+      customer_first_name,
+      customer_last_name,
+      customer_phone,
     })
     .select()
     .single();
@@ -72,7 +112,7 @@ export async function POST(req) {
     });
   }
 
-  // Items de commande
+  // Items de commande (qty = quantité * nb de jours)
   const rows = (cart || []).map((it) => ({
     order_id: order.id,
     product_id: it.product.id,

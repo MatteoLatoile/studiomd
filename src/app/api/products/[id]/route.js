@@ -1,5 +1,8 @@
+// app/api/products/[id]/route.js
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
+
+export const dynamic = "force-dynamic";
 
 export async function PUT(req, { params }) {
   const supabase = createRouteHandlerClient({ cookies });
@@ -7,21 +10,25 @@ export async function PUT(req, { params }) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user)
+  if (!user) {
     return new Response(JSON.stringify({ error: "Non authentifié" }), {
       status: 401,
     });
-  if (!user.app_metadata?.is_admin)
+  }
+  if (!user.app_metadata?.is_admin) {
     return new Response(JSON.stringify({ error: "Non autorisé" }), {
       status: 403,
     });
+  }
 
   const id = params.id;
 
-  // récupérer l'existant (pour old image_path)
+  // Produit courant
   const { data: current, error: curErr } = await supabase
     .from("products")
-    .select("id, name, description, price, category, image_url, image_path")
+    .select(
+      "id, name, description, price, category, image_url, image_path, stock"
+    )
     .eq("id", id)
     .single();
 
@@ -41,6 +48,12 @@ export async function PUT(req, { params }) {
       ? Number(form.get("price"))
       : Number(current.price);
   const category = (form.get("category") || current.category).toString().trim();
+  const stockRaw = form.get("stock");
+  const stock =
+    stockRaw != null
+      ? Math.max(1, parseInt(String(stockRaw), 10))
+      : current.stock;
+
   const file = form.get("image"); // optionnel
 
   if (!name || !description || !category || Number.isNaN(price)) {
@@ -53,7 +66,7 @@ export async function PUT(req, { params }) {
   let nextImageUrl = current.image_url;
   let uploadedNew = false;
 
-  // si une nouvelle image a été fournie
+  // Nouvelle image ?
   if (file instanceof File && file.size > 0) {
     const safeName = (file.name || "image.jpg").replace(/[^\w.-]/g, "_");
     const ext = (safeName.split(".").pop() || "jpg").toLowerCase();
@@ -71,18 +84,20 @@ export async function PUT(req, { params }) {
     if (upErr) {
       return new Response(
         JSON.stringify({ error: `Upload échoué: ${upErr.message}` }),
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    const { data: pub } = supabase.storage
+    const { data: pub } = await supabase.storage
       .from("products")
       .getPublicUrl(nextImagePath);
     nextImageUrl = pub.publicUrl;
     uploadedNew = true;
   }
 
-  // update DB
+  // Update DB
   const { data: updated, error: updErr } = await supabase
     .from("products")
     .update({
@@ -92,6 +107,7 @@ export async function PUT(req, { params }) {
       category,
       image_url: nextImageUrl,
       image_path: nextImagePath,
+      stock,
     })
     .eq("id", id)
     .select()
@@ -104,11 +120,13 @@ export async function PUT(req, { params }) {
     }
     return new Response(
       JSON.stringify({ error: `Update échoué: ${updErr.message}` }),
-      { status: 400 }
+      {
+        status: 400,
+      }
     );
   }
 
-  // si nouvelle image ok → supprimer l’ancienne
+  // supprimer l’ancienne image si nouvelle ok
   if (
     uploadedNew &&
     current.image_path &&
@@ -120,21 +138,24 @@ export async function PUT(req, { params }) {
   return new Response(JSON.stringify({ data: updated }), { status: 200 });
 }
 
-export async function DELETE(req, { params }) {
+export async function DELETE(_req, { params }) {
   const supabase = createRouteHandlerClient({ cookies });
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user)
+  if (!user) {
     return new Response(JSON.stringify({ error: "Non authentifié" }), {
       status: 401,
     });
-  if (!user.app_metadata?.is_admin)
+  }
+  if (!user.app_metadata?.is_admin) {
     return new Response(JSON.stringify({ error: "Non autorisé" }), {
       status: 403,
     });
+  }
 
+  // Récupérer image_path avant suppression
   const { data: product, error: getErr } = await supabase
     .from("products")
     .select("id, image_path")
@@ -147,6 +168,7 @@ export async function DELETE(req, { params }) {
     });
   }
 
+  // Supprimer fichier Storage
   if (product.image_path) {
     await supabase.storage.from("products").remove([product.image_path]);
   }
@@ -155,10 +177,11 @@ export async function DELETE(req, { params }) {
     .from("products")
     .delete()
     .eq("id", params.id);
-  if (delErr)
+  if (delErr) {
     return new Response(JSON.stringify({ error: delErr.message }), {
       status: 400,
     });
+  }
 
   return new Response(JSON.stringify({ success: true }), { status: 200 });
 }
