@@ -3,6 +3,16 @@
 import { useMemo, useState } from "react";
 import { FiEdit2 } from "react-icons/fi";
 
+const CATEGORIES = [
+  "Batterie",
+  "Camera",
+  "costume-accesoire",
+  "eclairage",
+  "machinerie",
+  "monitoring",
+  "son",
+];
+
 export default function EditProductButton({
   product,
   categories = [],
@@ -13,13 +23,35 @@ export default function EditProductButton({
   const [err, setErr] = useState(null);
   const [preview, setPreview] = useState(product.image_url || "");
 
-  const sortedCats = useMemo(
-    () => Array.from(new Set(categories.filter(Boolean))).sort(),
-    [categories]
+  // Tags UI
+  const [tagInput, setTagInput] = useState("");
+  const [tags, setTags] = useState(
+    Array.isArray(product?.tags) ? product.tags : []
   );
 
-  // la catégorie du produit n’est peut-être pas dans la liste (au cas où)
+  const sortedCats = useMemo(() => {
+    const base = CATEGORIES.length ? CATEGORIES : categories;
+    return Array.from(new Set(base.filter(Boolean)));
+  }, [categories]);
+
   const catInList = sortedCats.includes(product.category);
+
+  function addTag() {
+    const t = tagInput.trim();
+    if (!t) return;
+    if (tags.includes(t)) return;
+    setTags((prev) => [...prev, t]);
+    setTagInput("");
+  }
+  function removeTag(idx) {
+    setTags((prev) => prev.filter((_, i) => i !== idx));
+  }
+  function onTagKey(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addTag();
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -29,11 +61,19 @@ export default function EditProductButton({
     const formEl = e.currentTarget;
     const fd = new FormData(formEl);
 
-    // si "Autre…" est choisi, remplace par la valeur saisie
     if (fd.get("category") === "__other__") {
       fd.set("category", (fd.get("other_category") || "").toString().trim());
     }
     fd.delete("other_category");
+
+    const stock = Math.max(
+      0,
+      parseInt(fd.get("stock") ?? product.stock ?? 0, 10) || 0
+    );
+    fd.set("stock", String(stock));
+
+    // 👉 envoyer la liste de tags mise à jour
+    fd.set("tags", JSON.stringify(tags));
 
     try {
       const res = await fetch(`/api/products/${product.id}`, {
@@ -50,7 +90,6 @@ export default function EditProductButton({
         throw new Error(payload?.error || `HTTP ${res.status}`);
       }
 
-      // retour à l’UI
       onUpdated?.(payload.data);
       setOpen(false);
     } catch (e) {
@@ -69,7 +108,7 @@ export default function EditProductButton({
 
   return (
     <>
-      {/* Bouton modifier (admin only – tu le rends conditionnel dans la card) */}
+      {/* Bouton modifier */}
       <button
         onClick={() => setOpen(true)}
         className="rounded-full px-3 py-1 text-xs font-semibold shadow cursor-pointer
@@ -84,8 +123,8 @@ export default function EditProductButton({
 
       {open && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-4">
+          <div className="w-full max-w-xl max-h-[85vh] overflow-auto rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4 sticky top-0 bg-white">
               <h2 className="text-xl font-semibold">Modifier le produit</h2>
               <button
                 onClick={() => setOpen(false)}
@@ -156,6 +195,19 @@ export default function EditProductButton({
                   />
                 </label>
 
+                <label>
+                  <span className="block text-sm font-medium">Stock</span>
+                  <input
+                    name="stock"
+                    type="number"
+                    min="0"
+                    step="1"
+                    defaultValue={Number(product.stock ?? 0)}
+                    required
+                    className="mt-1 w-full rounded-lg border p-2"
+                  />
+                </label>
+
                 <div>
                   <span className="block text-sm font-medium">Catégorie</span>
                   <select
@@ -163,7 +215,6 @@ export default function EditProductButton({
                     className="mt-1 w-full rounded-lg border p-2"
                     defaultValue={catInList ? product.category : "__other__"}
                     onChange={(e) => {
-                      // si autre => afficher champ texte
                       const otherRow = document.getElementById(
                         `other-cat-${product.id}`
                       );
@@ -199,11 +250,58 @@ export default function EditProductButton({
                     defaultValue={catInList ? "" : product.category}
                   />
                 </label>
+
+                {/* TAGS */}
+                <div className="col-span-2">
+                  <span className="block text-sm font-medium">Tags</span>
+                  <div className="mt-1 flex gap-2">
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={onTagKey}
+                      placeholder="ex: 4K, XLR, Vmount…"
+                      className="flex-1 rounded-lg border p-2 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={addTag}
+                      className="px-3 py-2 rounded-lg text-black font-semibold cursor-pointer shadow"
+                      style={{
+                        background:
+                          "linear-gradient(90deg,#FFC119 0%, #FFEB83 100%)",
+                      }}
+                    >
+                      Ajouter
+                    </button>
+                  </div>
+                  {tags.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {tags.map((t, idx) => (
+                        <span
+                          key={`${t}-${idx}`}
+                          className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-[#E9F0FF] ring-1 ring-[#B9CEFF]/70"
+                        >
+                          {t}
+                          <button
+                            type="button"
+                            onClick={() => removeTag(idx)}
+                            className="ml-1 text-xs leading-none"
+                            aria-label={`Supprimer ${t}`}
+                            title="Supprimer"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {err && <p className="text-red-600 text-sm">{err}</p>}
 
-              <div className="flex items-center justify-end gap-3 pt-2">
+              <div className="flex items-center justify-end gap-3 pt-2 sticky bottom-0 bg-white">
                 <button
                   type="button"
                   onClick={() => setOpen(false)}

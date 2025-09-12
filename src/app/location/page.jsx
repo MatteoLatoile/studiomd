@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { FiSearch } from "react-icons/fi";
 import AddProductFAB from "../components/AddProductFAB";
@@ -8,19 +9,36 @@ import ProductCard from "../components/ProductCard";
 import { supabase } from "../lib/supabase";
 
 export default function LocationPage() {
+  const searchParams = useSearchParams();
+
   const [search, setSearch] = useState("");
   const [selectedCategories, setSelectedCategories] = useState([]);
+  // on garde l’état pour compat, mais on ne l’utilise plus
   const [selectedBrands, setSelectedBrands] = useState([]);
   const [priceRange, setPriceRange] = useState([0, 10000]);
 
-  // 👇 dates de dispo
+  // filtres dates (nouveau)
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
+
   const [user, setUser] = useState(null);
+
+  // hydrate depuis URL AU PREMIER RENDER
+  useEffect(() => {
+    const cat = searchParams.get("category");
+    // brand retiré: on ignore tout paramètre "brand"
+    const start = searchParams.get("start");
+    const end = searchParams.get("end");
+
+    if (cat) setSelectedCategories([cat]);
+    if (start) setStartDate(start);
+    if (end) setEndDate(end);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // une seule fois au mount
 
   // user => isAdmin
   useEffect(() => {
@@ -38,45 +56,29 @@ export default function LocationPage() {
   }, []);
   const isAdmin = !!user?.app_metadata?.is_admin;
 
-  // fetch products (RPC si dates choisies)
-  async function loadProducts() {
-    setLoading(true);
-    setErr(null);
-    try {
-      let data, error;
-
-      if (startDate && endDate) {
-        const res = await supabase.rpc("products_available", {
-          p_start: startDate,
-          p_end: endDate,
-        });
-        data = res.data;
-        error = res.error;
-      } else {
-        const res = await supabase
-          .from("products")
-          .select(
-            "id, name, description, price, category, image_url, image_path, created_at"
-          )
-          .order("created_at", { ascending: false });
-        data = res.data;
-        error = res.error;
-      }
-
-      if (error) throw error;
-      setProducts(data || []);
-    } catch (e) {
-      setErr(e.message || "Erreur de chargement");
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
+  // fetch products (⚠️ on NE sélectionne PAS "brand")
   useEffect(() => {
-    loadProducts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDate, endDate]);
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      setErr(null);
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, description, price, category, image_url, image_path")
+        .order("created_at", { ascending: false });
+      if (!mounted) return;
+      if (error) {
+        setErr(error.message);
+        setProducts([]);
+      } else {
+        setProducts(data || []);
+      }
+      setLoading(false);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // catégories → filtres + modal
   const allCategories = useMemo(() => {
@@ -86,21 +88,25 @@ export default function LocationPage() {
     return Array.from(set).sort();
   }, [products]);
 
-  // filtrage client (texte / cat / marque / prix)
+  // on masque totalement les marques (pas de colonne brand)
+  const allBrands = []; // <- important: évite toute utilisation de brand
+
+  // filtrage local (sans brand)
   const filtered = useMemo(() => {
     return (products || []).filter((product) => {
       const name = (product.name || "").toLowerCase();
       const matchesSearch = name.includes(search.toLowerCase());
+
       const matchesCategory =
         selectedCategories.length === 0 ||
         selectedCategories.includes(product.category);
-      const matchesBrand =
-        selectedBrands.length === 0 || selectedBrands.includes(product.brand); // (brand si tu l’ajoutes plus tard)
+
       const price = Number(product.price) || 0;
       const matchesPrice = price >= priceRange[0] && price <= priceRange[1];
-      return matchesSearch && matchesCategory && matchesBrand && matchesPrice;
+
+      return matchesSearch && matchesCategory && matchesPrice;
     });
-  }, [products, search, selectedCategories, selectedBrands, priceRange]);
+  }, [products, search, selectedCategories, priceRange]);
 
   return (
     <div className="bg-[#FDF6E3] min-h-screen py-30 px-4 md:px-15 relative">
@@ -113,13 +119,13 @@ export default function LocationPage() {
       <div className="mt-6 grid grid-cols-1 md:grid-cols-[250px_1fr] gap-6">
         <Filters
           categories={allCategories}
+          brands={allBrands} // <- vide => section masquée
           selectedCategories={selectedCategories}
           setSelectedCategories={setSelectedCategories}
           selectedBrands={selectedBrands}
           setSelectedBrands={setSelectedBrands}
           priceRange={priceRange}
           setPriceRange={setPriceRange}
-          // 👇 dates
           startDate={startDate}
           endDate={endDate}
           setStartDate={setStartDate}
@@ -162,11 +168,7 @@ export default function LocationPage() {
 
               {filtered.length === 0 && (
                 <p className="text-sm text-noir/60">
-                  Aucun produit{" "}
-                  {startDate && endDate
-                    ? "disponible sur ces dates"
-                    : "ne correspond à votre recherche"}
-                  .
+                  Aucun produit ne correspond à votre recherche.
                 </p>
               )}
             </div>

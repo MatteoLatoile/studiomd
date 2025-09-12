@@ -1,3 +1,5 @@
+"use client";
+
 import { FiBox } from "react-icons/fi";
 import AddToCartButton from "./AddToCartButton";
 import DeleteProductButton from "./DeleteProductButton";
@@ -11,6 +13,7 @@ export default function ProductCard({
   onUpdated,
 }) {
   const hasImage = Boolean(product?.image_url);
+  const tags = Array.isArray(product?.tags) ? product.tags : [];
 
   return (
     <div className="relative bg-white rounded-xl shadow p-4 space-y-2 ring-1 ring-[#f5e8c7]">
@@ -53,6 +56,21 @@ export default function ProductCard({
           {product.description || "—"}
         </p>
       </div>
+
+      {/* Tags */}
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-1">
+          {tags.map((t, i) => (
+            <span
+              key={`${t}-${i}`}
+              className="text-[11px] px-2 py-0.5 rounded-full bg-[#FFF3C4] ring-1 ring-[#FFD966]/70 text-noir"
+              title={`Tag: ${t}`}
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
 
       <p className="text-sm text-noir">
         à {Number(product.price).toFixed(2)}€{" "}

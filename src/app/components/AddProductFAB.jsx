@@ -2,6 +2,17 @@
 
 import { useMemo, useState } from "react";
 
+// Catégories (ta liste figée)
+const CATEGORIES = [
+  "Batterie",
+  "Camera",
+  "costume-accesoire",
+  "eclairage",
+  "machinerie",
+  "monitoring",
+  "son",
+];
+
 export default function AddProductFAB({ isAdmin, categories = [], onCreated }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -9,12 +20,33 @@ export default function AddProductFAB({ isAdmin, categories = [], onCreated }) {
 
   const [useOtherCat, setUseOtherCat] = useState(false);
 
-  const sortedCats = useMemo(
-    () => Array.from(new Set(categories.filter(Boolean))).sort(),
-    [categories]
-  );
+  // Tags UI
+  const [tagInput, setTagInput] = useState("");
+  const [tags, setTags] = useState([]);
 
-  if (!isAdmin) return null; // visible uniquement admin
+  const sortedCats = useMemo(() => {
+    const base = CATEGORIES.length ? CATEGORIES : categories;
+    return Array.from(new Set(base.filter(Boolean)));
+  }, [categories]);
+
+  if (!isAdmin) return null;
+
+  function addTag() {
+    const t = tagInput.trim();
+    if (!t) return;
+    if (tags.includes(t)) return;
+    setTags((prev) => [...prev, t]);
+    setTagInput("");
+  }
+  function removeTag(idx) {
+    setTags((prev) => prev.filter((_, i) => i !== idx));
+  }
+  function onTagKey(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addTag();
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -24,11 +56,16 @@ export default function AddProductFAB({ isAdmin, categories = [], onCreated }) {
     const formEl = e.currentTarget;
     const fd = new FormData(formEl);
 
-    // catégorie : si “Autre…”, on remplace par le champ texte
     if (fd.get("category") === "__other__") {
       fd.set("category", (fd.get("other_category") || "").toString().trim());
     }
     fd.delete("other_category");
+
+    const stock = Math.max(0, parseInt(fd.get("stock") || "0", 10) || 0);
+    fd.set("stock", String(stock));
+
+    // 👉 envoyer les tags en JSON (string)
+    fd.set("tags", JSON.stringify(tags));
 
     const res = await fetch("/api/products", { method: "POST", body: fd });
     const payload = await res.json();
@@ -41,13 +78,14 @@ export default function AddProductFAB({ isAdmin, categories = [], onCreated }) {
 
     formEl.reset();
     setUseOtherCat(false);
+    setTags([]);
     setOpen(false);
     onCreated?.(payload.data);
   }
 
   return (
     <>
-      {/* Floating Action Button */}
+      {/* FAB */}
       <button
         onClick={() => setOpen(true)}
         className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 h-16 w-16 rounded-full shadow-xl cursor-pointer
@@ -63,8 +101,8 @@ export default function AddProductFAB({ isAdmin, categories = [], onCreated }) {
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-4">
+          <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4 sticky top-0 bg-white pb-2">
               <h2 className="text-xl font-semibold">Ajouter un produit</h2>
               <button
                 onClick={() => setOpen(false)}
@@ -122,46 +160,108 @@ export default function AddProductFAB({ isAdmin, categories = [], onCreated }) {
                   />
                 </label>
 
-                <div>
-                  <span className="block text-sm font-medium">Catégorie</span>
-                  <select
-                    name="category"
-                    className="mt-1 w-full rounded-lg border p-2"
-                    onChange={(e) =>
-                      setUseOtherCat(e.target.value === "__other__")
-                    }
-                    defaultValue=""
+                <label>
+                  <span className="block text-sm font-medium">Stock</span>
+                  <input
+                    name="stock"
+                    type="number"
+                    min="0"
+                    step="1"
+                    defaultValue={1}
                     required
-                  >
-                    <option value="" disabled>
-                      Choisir…
-                    </option>
-                    {sortedCats.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
+                    className="mt-1 w-full rounded-lg border p-2"
+                  />
+                </label>
+
+                <div className="col-span-2 grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="block text-sm font-medium">Catégorie</span>
+                    <select
+                      name="category"
+                      className="mt-1 w-full rounded-lg border p-2"
+                      onChange={(e) =>
+                        setUseOtherCat(e.target.value === "__other__")
+                      }
+                      defaultValue=""
+                      required
+                    >
+                      <option value="" disabled>
+                        Choisir…
                       </option>
-                    ))}
-                    <option value="__other__">Autre…</option>
-                  </select>
+                      {sortedCats.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                      <option value="__other__">Autre…</option>
+                    </select>
+                  </div>
+
+                  {useOtherCat && (
+                    <label>
+                      <span className="block text-sm font-medium">
+                        Nouvelle catégorie
+                      </span>
+                      <input
+                        name="other_category"
+                        className="mt-1 w-full rounded-lg border p-2"
+                        placeholder="ex: Accessoires"
+                      />
+                    </label>
+                  )}
                 </div>
 
-                {useOtherCat && (
-                  <label>
-                    <span className="block text-sm font-medium">
-                      Nouvelle catégorie
-                    </span>
+                {/* TAGS */}
+                <div className="col-span-2">
+                  <span className="block text-sm font-medium">Tags</span>
+                  <div className="mt-1 flex gap-2">
                     <input
-                      name="other_category"
-                      className="mt-1 w-full rounded-lg border p-2"
-                      placeholder="ex: Accessoires"
+                      type="text"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={onTagKey}
+                      placeholder="ex: 4K, XLR, Vmount…"
+                      className="flex-1 rounded-lg border p-2 text-sm"
                     />
-                  </label>
-                )}
+                    <button
+                      type="button"
+                      onClick={addTag}
+                      className="px-3 py-2 rounded-lg text-black font-semibold cursor-pointer shadow"
+                      style={{
+                        background:
+                          "linear-gradient(90deg,#FFC119 0%, #FFEB83 100%)",
+                      }}
+                    >
+                      Ajouter
+                    </button>
+                  </div>
+                  {tags.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {tags.map((t, idx) => (
+                        <span
+                          key={`${t}-${idx}`}
+                          className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-[#E9F0FF] ring-1 ring-[#B9CEFF]/70"
+                        >
+                          {t}
+                          <button
+                            type="button"
+                            onClick={() => removeTag(idx)}
+                            className="ml-1 text-xs leading-none"
+                            aria-label={`Supprimer ${t}`}
+                            title="Supprimer"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {err && <p className="text-red-600 text-sm">{err}</p>}
 
-              <div className="flex items-center justify-end gap-3 pt-2">
+              <div className="flex items-center justify-end gap-3 pt-2 sticky bottom-0 bg-white md:pt-4">
                 <button
                   type="button"
                   onClick={() => setOpen(false)}

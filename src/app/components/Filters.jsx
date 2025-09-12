@@ -3,15 +3,18 @@
 import { useMemo } from "react";
 import { FiCalendar, FiFilter, FiRotateCw, FiX } from "react-icons/fi";
 
+// ✅ Catégories figées demandées
 const DEFAULT_CATEGORIES = [
-  "Éclairage",
-  "Vidéo-assist",
-  "Accessoires",
-  "Caméras",
-  "Audio",
+  "Batterie",
+  "Camera",
+  "costume-accesoire",
+  "eclairage",
+  "machinerie",
+  "monitoring",
+  "son",
 ];
-const DEFAULT_BRANDS = ["Canon", "Sony"];
 
+// Ici on masque la section “marques” si tu ne la renseignes pas
 function isoToday() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -19,7 +22,7 @@ function isoToday() {
 }
 
 export default function Filters({
-  categories: categoriesProp,
+  categories: categoriesProp, // on ignore si vide et on retombe sur DEFAULT_CATEGORIES
   brands: brandsProp,
   selectedCategories,
   setSelectedCategories,
@@ -27,12 +30,12 @@ export default function Filters({
   setSelectedBrands,
   priceRange,
   setPriceRange,
-  // 👇 nouveaux props pour la dispo par dates
   startDate,
   endDate,
   setStartDate,
   setEndDate,
 }) {
+  // on force l’usage de la liste figée si rien n’est passé
   const categories = useMemo(
     () =>
       Array.isArray(categoriesProp) && categoriesProp.length
@@ -40,15 +43,13 @@ export default function Filters({
         : DEFAULT_CATEGORIES,
     [categoriesProp]
   );
+
+  // si brandsProp est vide → section masquée
   const brands = useMemo(
-    () =>
-      Array.isArray(brandsProp) && brandsProp.length
-        ? brandsProp
-        : DEFAULT_BRANDS,
+    () => (Array.isArray(brandsProp) && brandsProp.length ? brandsProp : []),
     [brandsProp]
   );
 
-  // bornes prix
   const MIN_P = 0;
   const MAX_P = 10000;
   const GAP = 1;
@@ -63,12 +64,10 @@ export default function Filters({
     setSelectedCategories([]);
     setSelectedBrands([]);
     setPriceRange([MIN_P, MAX_P]);
-    // reset dates
     setStartDate("");
     setEndDate("");
   };
 
-  // slider min/max
   const onMinChange = (v) => {
     const n = Math.min(Math.max(Number(v), MIN_P), priceRange[1] - GAP);
     setPriceRange([n, priceRange[1]]);
@@ -103,7 +102,7 @@ export default function Filters({
             </button>
           </div>
 
-          {/* Badges sélectionnés */}
+          {/* Badges actifs */}
           {(selectedCategories.length > 0 ||
             selectedBrands.length > 0 ||
             (startDate && endDate)) && (
@@ -138,25 +137,29 @@ export default function Filters({
                     <FiX className="opacity-70 group-hover:opacity-100" />
                   </button>
                 ))}
-                {selectedBrands.map((b) => (
-                  <button
-                    key={`brand-${b}`}
-                    onClick={() => toggle(selectedBrands, b, setSelectedBrands)}
-                    className="group inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium
-                               bg-[#E9F0FF] ring-1 ring-[#B9CEFF]/70 hover:bg-[#D9E6FF] transition cursor-pointer"
-                    title="Retirer ce filtre"
-                  >
-                    {b}
-                    <FiX className="opacity-70 group-hover:opacity-100" />
-                  </button>
-                ))}
+
+                {brands.length > 0 &&
+                  selectedBrands.map((b) => (
+                    <button
+                      key={`brand-${b}`}
+                      onClick={() =>
+                        toggle(selectedBrands, b, setSelectedBrands)
+                      }
+                      className="group inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium
+                                 bg-[#E9F0FF] ring-1 ring-[#B9CEFF]/70 hover:bg-[#D9E6FF] transition cursor-pointer"
+                      title="Retirer ce filtre"
+                    >
+                      {b}
+                      <FiX className="opacity-70 group-hover:opacity-100" />
+                    </button>
+                  ))}
               </div>
             </div>
           )}
 
           {/* Sections */}
           <div className="px-5 py-5 space-y-8">
-            {/* Disponibilité par dates */}
+            {/* Disponibilité */}
             <section>
               <h3 className="text-sm font-semibold text-noir mb-3 flex items-center gap-2">
                 <FiCalendar className="text-[#FFC119]" />
@@ -226,37 +229,41 @@ export default function Filters({
               </div>
             </section>
 
-            {/* Marques (placeholder si tu ajoutes la donnée plus tard) */}
-            <section>
-              <h3 className="text-sm font-semibold text-noir mb-3">Marques</h3>
-              <div className="flex flex-wrap gap-2">
-                {brands.map((b) => {
-                  const checked = selectedBrands.includes(b);
-                  return (
-                    <label
-                      key={b}
-                      className={[
-                        "cursor-pointer select-none rounded-full px-3 py-1.5 text-xs font-semibold transition",
-                        "ring-1 hover:ring-2",
-                        checked
-                          ? "bg-white text-noir ring-[#B9CEFF] shadow-[0_4px_14px_rgba(100,120,255,0.15)]"
-                          : "bg-white text-noir ring-black/10 hover:ring-[#90A7FF]/50",
-                      ].join(" ")}
-                    >
-                      <input
-                        type="checkbox"
-                        className="sr-only"
-                        checked={checked}
-                        onChange={() =>
-                          toggle(selectedBrands, b, setSelectedBrands)
-                        }
-                      />
-                      {b}
-                    </label>
-                  );
-                })}
-              </div>
-            </section>
+            {/* Marques — affichée seulement si brands non vide */}
+            {brands.length > 0 && (
+              <section>
+                <h3 className="text-sm font-semibold text-noir mb-3">
+                  Marques
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {brands.map((b) => {
+                    const checked = selectedBrands.includes(b);
+                    return (
+                      <label
+                        key={b}
+                        className={[
+                          "cursor-pointer select-none rounded-full px-3 py-1.5 text-xs font-semibold transition",
+                          "ring-1 hover:ring-2",
+                          checked
+                            ? "bg-white text-noir ring-[#B9CEFF] shadow-[0_4px_14px_rgba(100,120,255,0.15)]"
+                            : "bg-white text-noir ring-black/10 hover:ring-[#90A7FF]/50",
+                        ].join(" ")}
+                      >
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          checked={checked}
+                          onChange={() =>
+                            toggle(selectedBrands, b, setSelectedBrands)
+                          }
+                        />
+                        {b}
+                      </label>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
             {/* Prix / jour */}
             <section>

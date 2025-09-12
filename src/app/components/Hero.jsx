@@ -2,8 +2,9 @@
 
 import { LazyMotion, domAnimation, m, useReducedMotion } from "framer-motion";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { FiArrowRight, FiCalendar, FiMapPin, FiSearch } from "react-icons/fi";
+import { FiArrowRight, FiCalendar } from "react-icons/fi";
 import ImageHero from "../../../public/imge_hero.png";
 
 const ease = [0.22, 1, 0.36, 1];
@@ -30,10 +31,33 @@ function Skel({ className = "" }) {
   );
 }
 
+const CATEGORIES = [
+  "Caméras",
+  "Audio",
+  "Éclairage",
+  "Vidéo-assist",
+  "Accessoires",
+];
+
 const Hero = () => {
+  const router = useRouter();
   const reduce = useReducedMotion();
   const today = new Date().toISOString().split("T")[0];
   const [imgReady, setImgReady] = useState(false);
+
+  // états du mini-formulaire
+  const [category, setCategory] = useState("");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+
+  function onSearch() {
+    const params = new URLSearchParams();
+    if (category) params.set("category", category);
+    if (start) params.set("start", start);
+    if (end) params.set("end", end);
+    const qs = params.toString();
+    router.push(qs ? `/location?${qs}` : "/location");
+  }
 
   return (
     <section
@@ -85,7 +109,7 @@ const Hero = () => {
           }}
         />
 
-        {/* SKELETON (visible tant que l'image n'est pas prête) */}
+        {/* SKELETON */}
         {!imgReady && (
           <div className="absolute inset-0 z-20 px-6 md:px-20 flex items-center">
             <div className="max-w-xl w-full space-y-6">
@@ -108,7 +132,7 @@ const Hero = () => {
           </div>
         )}
 
-        {/* CONTENU (crossfade quand l'image est prête) */}
+        {/* CONTENU */}
         <m.div
           className="absolute inset-0 flex items-center justify-start px-6 md:px-20 z-10"
           initial={reduce ? false : { opacity: 0, y: 22 }}
@@ -178,15 +202,22 @@ const Hero = () => {
               <p className="text-noir font-medium">Matériel</p>
 
               <div className="grid grid-cols-2 gap-3">
-                {/* Recherche référence */}
-                <div className="flex items-center gap-2 border border-gray-300 px-3 py-2 rounded-lg bg-white col-span-2 focus-within:border-gray-400 focus-within:ring-2 focus-within:ring-[#FFB700]/30">
-                  <FiSearch className="text-[#FFB700] text-lg" />
-                  <input
-                    type="text"
-                    placeholder="Rechercher une référence... (caméra, micro..)"
-                    className="w-full outline-none text-sm placeholder-gray-400"
-                  />
-                </div>
+                {/* Catégorie (select) */}
+                <label className="col-span-2 text-[12px] text-noir/80">
+                  Catégorie
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="mt-1 w-full text-sm rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-gray-400 focus:ring-2 focus:ring-[#FFB700]/30"
+                  >
+                    <option value="">Toutes les catégories</option>
+                    {CATEGORIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
                 {/* Date début */}
                 <label className="flex items-center gap-2 border border-gray-300 px-3 py-2 rounded-lg bg-white focus-within:border-gray-400 focus-within:ring-2 focus-within:ring-[#FFB700]/30">
@@ -194,6 +225,14 @@ const Hero = () => {
                   <input
                     type="date"
                     min={today}
+                    value={start}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setStart(v);
+                      if (end && v && new Date(end) < new Date(v)) {
+                        setEnd(v);
+                      }
+                    }}
                     className="w-full text-sm outline-none appearance-none [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                   />
                 </label>
@@ -203,35 +242,16 @@ const Hero = () => {
                   <FiCalendar className="text-[#FFB700] text-lg" />
                   <input
                     type="date"
-                    min={today}
+                    min={start || today}
+                    value={end}
+                    onChange={(e) => setEnd(e.target.value)}
                     className="w-full text-sm outline-none appearance-none [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                   />
                 </label>
 
-                {/* Ville (disabled + tooltip) */}
-                <div className="relative group flex items-center gap-2 border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 cursor-not-allowed">
-                  <FiMapPin className="text-[#FFB700] text-lg opacity-70" />
-                  <input
-                    type="text"
-                    value="Lyon"
-                    disabled
-                    readOnly
-                    aria-label="Lieu de retrait: Lyon uniquement"
-                    className="w-full text-sm bg-transparent text-gray-600 outline-none disabled:cursor-not-allowed"
-                    title="Retrait disponible uniquement à Lyon"
-                  />
-                  {/* Tooltip */}
-                  <span
-                    role="tooltip"
-                    className="pointer-events-none absolute -top-10 left-0 whitespace-nowrap rounded-md bg-black/80 px-3 py-1 text-xs text-white opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition"
-                  >
-                    Retrait disponible uniquement à Lyon
-                  </span>
-                  <span className="pointer-events-none absolute -top-3 left-4 h-2 w-2 rotate-45 bg-black/80 opacity-0 group-hover:opacity-100 transition" />
-                </div>
-
                 <m.button
-                  className="bg-[#FFB700] hover:bg-orFonce text-noir font-semibold rounded-lg px-4 py-2"
+                  onClick={onSearch}
+                  className="col-span-2 bg-[#FFB700] hover:bg-orFonce text-noir font-semibold rounded-lg px-4 py-2"
                   whileTap={reduce ? undefined : { scale: 0.98 }}
                 >
                   Recherche
@@ -243,6 +263,7 @@ const Hero = () => {
               </p>
 
               <m.button
+                onClick={() => router.push("/location")}
                 className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#FFC119] to-[#FFEB83] text-noir font-semibold py-3 rounded-xl shadow"
                 whileTap={reduce ? undefined : { scale: 0.98 }}
               >
