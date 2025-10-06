@@ -22,41 +22,56 @@ export default function Header() {
 
   const pathname = usePathname();
   const isHome = pathname === "/";
-  const isDarkPage = useMemo(
-    () => pathname?.startsWith("/productions"),
-    [pathname]
+
+  // --- Exceptions en mode clair
+  const lightRoutes = useMemo(
+    () => [
+      "/location",
+      "/panier",
+      "/panier/checkout",
+      "/panier/checkout/confirmation",
+    ],
+    []
   );
+  const isLightPage = useMemo(
+    () => lightRoutes.some((r) => pathname?.startsWith(r)),
+    [pathname, lightRoutes]
+  );
+
+  // Par défaut tout est dark, sauf exceptions ci-dessus
+  const isDarkPage = !isLightPage;
 
   const [visible, setVisible] = useState(!isHome);
   const ticking = useRef(false);
 
-  // --------- palette dynamique ----------
+  // palette
   const tone = useMemo(() => {
     if (isDarkPage) {
       return {
         headerBg: "supports-[backdrop-filter]:bg-[#00000099] bg-black/80",
-        link: "text-white hover:text-white", // blanc en dark
+        link: "text-white hover:text-white",
         dim: "text-white/80 hover:text-white",
         dropdownBg: "bg-[#0F0F14]/95 border border-white/10",
         userIcon: "text-white",
         hoverSurface: "hover:bg-white/5",
         mobilePanelBg: "bg-[#0F0F14]",
         mobilePanelText: "text-white",
+        cartIcon: "text-white",
       };
     }
     return {
       headerBg: "supports-[backdrop-filter]:bg-[#ffffff80] bg-[#FDF6E3]/95",
-      link: "text-noir hover:text-noir", // noir en light
+      link: "text-noir hover:text-noir",
       dim: "text-noir hover:text-noir",
       dropdownBg: "bg-white/90 border border-[#F5E8C7]",
       userIcon: "text-noir",
       hoverSurface: "hover:bg-blancCasse/60",
       mobilePanelBg: "bg-[#FDF6E3]",
       mobilePanelText: "text-noir",
+      cartIcon: "text-jaune",
     };
   }, [isDarkPage]);
 
-  // --------- util cart ----------
   async function fetchCartCount(uid) {
     if (!uid) return 0;
     const { data, error } = await supabase
@@ -70,7 +85,6 @@ export default function Header() {
     return (data || []).reduce((s, r) => s + (r?.quantity || 0), 0);
   }
 
-  // --------- auth + badge ----------
   useEffect(() => {
     let channel, poll;
 
@@ -96,7 +110,6 @@ export default function Header() {
           .subscribe();
       }
 
-      // Fallback polling (toutes les 10s)
       poll = setInterval(async () => {
         const { data: sess } = await supabase.auth.getUser();
         const uid = sess?.user?.id;
@@ -105,7 +118,6 @@ export default function Header() {
       }, 10000);
     })();
 
-    // Écoute manuelle optionnelle (si tu déclenches window.dispatchEvent(new Event("cart:changed")))
     const onManualChange = async () => {
       const { data: sess } = await supabase.auth.getUser();
       setCartCount(await fetchCartCount(sess?.user?.id));
@@ -144,7 +156,7 @@ export default function Header() {
     };
   }, []);
 
-  // --------- apparition (home only) ----------
+  // apparition (home)
   useEffect(() => {
     if (!isHome) {
       setVisible(true);
@@ -223,7 +235,7 @@ export default function Header() {
                 role="menu"
               >
                 <div
-                  className={`relative rounded-2xl overflow-hidden ${tone.dropdownBg} shadow-[0_10px_30px_rgba(0,0,0,0.18)] p-2`}
+                  className={`relative rounded-2xl overflow-hidden ${tone.dropdownBg} shadow-[0_10px_30px_rgba(0,0,0,0.4)] p-2`}
                 >
                   <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FFB700] to-[#FFEB83]" />
                   <ul className="pt-3">
@@ -259,7 +271,7 @@ export default function Header() {
               </div>
             </div>
 
-            <Link href="/a-propos" className={tone.link}>
+            <Link href="/about" className={tone.link}>
               à propos
             </Link>
             <Link href="/contact" className={tone.link}>
@@ -282,7 +294,7 @@ export default function Header() {
             className={`p-2 rounded-full ${tone.hoverSurface} transition`}
           >
             <span className="relative inline-block align-middle">
-              <FiShoppingCart className="text-jaune text-xl" />
+              <FiShoppingCart className={`${tone.cartIcon} text-xl`} />
               {user && cartCount > 0 && (
                 <span
                   className="absolute top-0 right-0 translate-x-1/3 -translate-y-1/3 min-w-[16px] h-[16px] px-[3px] rounded-full bg-red-600 text-white text-[10px] font-bold leading-[16px] text-center shadow pointer-events-none"
@@ -302,11 +314,23 @@ export default function Header() {
               >
                 <FiUser className={`text-2xl ${tone.userIcon}`} />
               </button>
+              {/* Dropdown */}
               <div
                 className={`absolute right-0 mt-2 w-48 ${
                   isDarkPage ? "bg-[#0F0F14]" : "bg-white"
                 } rounded-lg shadow-lg opacity-0 group-hover:opacity-100 group-hover:translate-y-1 transition-all duration-200 z-50 pointer-events-auto`}
               >
+                <Link
+                  href="/compte"
+                  className={`flex items-center gap-2 w-full px-4 py-3 text-sm rounded-lg transition ${
+                    isDarkPage
+                      ? "text-white hover:bg-white/5"
+                      : "text-noir hover:bg-[#FDF6E3] hover:ring-1 hover:ring-[#FFEB83]/70"
+                  }`}
+                >
+                  <span className="flex-1 text-left">Compte</span>
+                </Link>
+
                 {isAdmin && (
                   <Link
                     href="/dashboard"
@@ -319,6 +343,7 @@ export default function Header() {
                     <span className="flex-1 text-left">Dashboard</span>
                   </Link>
                 )}
+
                 <button
                   className={`flex items-center gap-2 w-full px-4 py-3 text-sm rounded-lg transition ${
                     isDarkPage
@@ -332,14 +357,14 @@ export default function Header() {
                 >
                   <FiX className="text-lg" />
                   <span className="flex-1 text-left">Déconnexion</span>
-                  <FiLogOut className="text-base text-jaune" />
+                  <FiLogOut className="text-base text-[#FFB700]" />
                 </button>
               </div>
             </div>
           ) : (
             <Link
               href="/connexion"
-              className="hidden sm:inline-flex items-center rounded-2xl px-10 py-4 text-sm font-medium text-noir shadow hover:opacity-90 transition"
+              className="hidden sm:inline-flex items-center rounded-2xl px-10 py-4 text-sm font-medium text-black shadow hover:opacity-90 transition"
               style={{
                 background:
                   "linear-gradient(90deg, rgba(255,193,25,1) 49%, rgba(255,235,131,1) 100%)",
@@ -368,7 +393,7 @@ export default function Header() {
         <div
           className="absolute inset-0 bg-black/40 backdrop-blur-sm"
           onClick={() => setMenuOpen(false)}
-        ></div>
+        />
         <div
           className={`absolute right-0 top-0 h-full w-72 ${tone.mobilePanelBg} ${tone.mobilePanelText} shadow-lg flex flex-col p-6`}
         >
@@ -412,12 +437,18 @@ export default function Header() {
                 </Link>
               </div>
             </details>
-            <Link href="/a-propos" onClick={() => setMenuOpen(false)}>
+            <Link href="/about" onClick={() => setMenuOpen(false)}>
               à propos
             </Link>
             <Link href="/contact" onClick={() => setMenuOpen(false)}>
               Contact
             </Link>
+
+            {user && (
+              <Link href="/compte" onClick={() => setMenuOpen(false)}>
+                Compte
+              </Link>
+            )}
             {isAdmin && (
               <Link href="/dashboard" onClick={() => setMenuOpen(false)}>
                 Dashboard
@@ -427,7 +458,7 @@ export default function Header() {
           <div className="mt-auto">
             {user ? (
               <button
-                className="w-full inline-flex items-center justify-center rounded-2xl px-10 py-3 text-sm font-medium text-noir shadow hover:opacity-90 transition"
+                className="w-full inline-flex items-center justify-center rounded-2xl px-10 py-3 text-sm font-medium text-black shadow hover:opacity-90 transition"
                 style={{
                   background:
                     "linear-gradient(90deg, rgba(255,193,25,1) 49%, rgba(255,235,131,1) 100%)",
@@ -442,7 +473,7 @@ export default function Header() {
             ) : (
               <Link
                 href="/connexion"
-                className="w-full inline-flex items-center justify-center rounded-2xl px-10 py-3 text-sm font-medium text-noir shadow hover:opacity-90 transition"
+                className="w-full inline-flex items-center justify-center rounded-2xl px-10 py-3 text-sm font-medium text-black shadow hover:opacity-90 transition"
                 style={{
                   background:
                     "linear-gradient(90deg, rgba(255,193,25,1) 49%, rgba(255,235,131,1) 100%)",

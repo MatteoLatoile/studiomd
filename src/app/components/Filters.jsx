@@ -84,7 +84,7 @@ export default function Filters({
   const canEndMin = startDate || today;
 
   return (
-    <aside className="sticky top-24 self-start">
+    <aside className="sticky text-black top-24 self-start">
       <div className="relative rounded-3xl p-[1px] bg-gradient-to-br from-[#FFC119] via-[#FFEB83] to-transparent shadow-[0_12px_40px_rgba(0,0,0,0.12)]">
         <div className="rounded-3xl bg-white/80 backdrop-blur-md ring-1 ring-black/5">
           {/* Header */}
@@ -333,7 +333,7 @@ export default function Filters({
                   max={MAX_P}
                   value={priceRange[1]}
                   onChange={(e) => onMaxChange(e.target.value)}
-                  className="absolute inset-0 w-full h-2 appearance-none bg-transparent pointer-events-auto"
+                  className="absolute inset-0 w-full h-2 text-black appearance-none bg-transparent pointer-events-auto"
                   style={{ WebkitAppearance: "none" }}
                 />
               </div>

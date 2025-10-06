@@ -19,7 +19,7 @@ const stagger = {
 
 export default function AProposPage() {
   return (
-    <main className="bg-[#FDF6E3] min-h-screen">
+    <main className="bg-[#0B0B0F] min-h-screen text-white">
       <LazyMotion features={domAnimation}>
         {/* HERO */}
         <section className="px-4 md:px-8 lg:px-20 pt-28 pb-8">
@@ -29,10 +29,10 @@ export default function AProposPage() {
             transition={{ duration: 0.6, ease }}
             className="max-w-5xl"
           >
-            <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-noir">
+            <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight">
               À <span className="text-[#FFB700]">propos</span>
             </h1>
-            <p className="text-sm md:text-base text-[#6B6B6B] mt-2">
+            <p className="text-sm md:text-base text-white/60 mt-2">
               S.A.S. SMD Factory — Société de production cinématographique.
             </p>
           </m.div>
@@ -77,10 +77,10 @@ export default function AProposPage() {
             viewport={{ once: true, amount: 0.5 }}
             className="max-w-4xl"
           >
-            <h2 className="text-2xl md:text-3xl font-bold text-noir">
+            <h2 className="text-2xl md:text-3xl font-bold">
               Qui sommes-nous ?
             </h2>
-            <p className="text-[#343434] mt-3 leading-7">
+            <p className="text-white/80 mt-3 leading-7">
               Et comment la société <strong>SMD Factory</strong> a-t-elle été
               créée ? La société SMD Factory est née de l’évolution du collectif{" "}
               <strong>Studio Mont D’or</strong>, fondé en 2021 par Kendrick
@@ -88,7 +88,7 @@ export default function AProposPage() {
               nombreux contenus audiovisuels : clips musicaux, courts-métrages,
               émissions, et bien plus encore.
             </p>
-            <p className="text-[#343434] mt-3 leading-7">
+            <p className="text-white/80 mt-3 leading-7">
               En 2023, <strong>Julien BOMPART</strong> et{" "}
               <strong>Maxime GARCIA</strong> rejoignent l’aventure. C’est à ce
               moment que les grands projets prennent forme, notamment{" "}
@@ -96,12 +96,12 @@ export default function AProposPage() {
               multiplient, les émissions se concrétisent, et une décision
               majeure est prise : professionnaliser l’activité.
             </p>
-            <p className="text-[#343434] mt-3 leading-7">
+            <p className="text-white/80 mt-3 leading-7">
               C’est ainsi qu’en 2025, la <strong>S.A.S SMD Factory</strong> voit
               le jour, fondée par Kendrick COURANT, Olivier COURANT, Maxime
               GARCIA et Julien BOMPART.
             </p>
-            <p className="text-[#343434] mt-3 leading-7">
+            <p className="text-white/80 mt-3 leading-7">
               Aujourd’hui, SMD Factory se spécialise dans le{" "}
               <strong>cinéma de genre</strong>, avec une prédilection pour
               l’horreur. Notre ambition : repousser les limites tout en
@@ -145,7 +145,7 @@ export default function AProposPage() {
             initial="hidden"
             whileInView="show"
             viewport={{ once: true, amount: 0.5 }}
-            className="text-2xl md:text-3xl font-bold text-noir"
+            className="text-2xl md:text-3xl font-bold"
           >
             Notre équipe
           </m.h3>
@@ -185,19 +185,19 @@ export default function AProposPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.5 }}
             transition={{ duration: 0.55, ease }}
-            className="rounded-3xl bg-[#ffffff90] backdrop-blur-sm ring-1 ring-black/5 p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+            className="rounded-3xl bg-[#0F1117]/90 backdrop-blur-sm ring-1 ring-white/10 p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
           >
             <div>
-              <h4 className="text-xl md:text-2xl font-semibold text-noir">
+              <h4 className="text-xl md:text-2xl font-semibold">
                 Un projet à nous confier ?
               </h4>
-              <p className="text-sm text-[#6B6B6B] mt-1">
+              <p className="text-sm text-white/60 mt-1">
                 On vous répond sous 24h ouvrées.
               </p>
             </div>
             <Link
               href="/contact"
-              className="inline-flex items-center justify-center rounded-2xl px-6 py-3 text-sm font-semibold text-noir shadow hover:opacity-90 transition"
+              className="inline-flex items-center justify-center rounded-2xl px-6 py-3 text-sm font-semibold text-black shadow hover:opacity-90 transition"
               style={{
                 background: "linear-gradient(90deg,#FFC119 0%, #FFEB83 100%)",
               }}
@@ -218,10 +218,10 @@ function InfoCard({ i, title, lines }) {
     <m.div
       variants={fadeUp}
       custom={i}
-      className="rounded-2xl bg-[#ffffff80] ring-1 ring-black/5 shadow-[0_10px_30px_rgba(0,0,0,0.06)] p-5"
+      className="rounded-2xl bg-[#0F1117] ring-1 ring-white/10 shadow-xl p-5"
     >
-      <h3 className="text-noir font-semibold">{title}</h3>
-      <ul className="mt-2 text-sm text-[#343434] space-y-1">
+      <h3 className="font-semibold">{title}</h3>
+      <ul className="mt-2 text-sm text-white/70 space-y-1">
         {lines.map((l, idx) => (
           <li key={idx}>{l}</li>
         ))}
@@ -235,13 +235,13 @@ function TimelineStep({ i, year, title, desc }) {
     <m.li
       variants={fadeUp}
       custom={i}
-      className="rounded-2xl bg-[#ffffff80] ring-1 ring-black/5 p-5 relative"
+      className="rounded-2xl bg-[#0F1117] ring-1 ring-white/10 p-5 relative"
     >
       <div className="absolute -left-1 top-5 h-3 w-3 rounded-full bg-[#FFB700]" />
       <div className="ml-4">
         <p className="text-xs font-semibold text-[#FFB700]">{year}</p>
-        <p className="text-noir font-semibold mt-1">{title}</p>
-        <p className="text-sm text-[#6B6B6B] mt-1">{desc}</p>
+        <p className="font-semibold mt-1">{title}</p>
+        <p className="text-sm text-white/70 mt-1">{desc}</p>
       </div>
     </m.li>
   );
@@ -252,14 +252,14 @@ function TeamCard({ i, name, role, initials }) {
     <m.article
       variants={fadeUp}
       custom={i}
-      className="rounded-2xl bg-[#ffffff80] ring-1 ring-black/5 p-5 flex items-start gap-4"
+      className="rounded-2xl bg-[#0F1117] ring-1 ring-white/10 p-5 flex items-start gap-4"
     >
-      <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-[#FFC119] to-[#FFEB83] text-noir font-extrabold grid place-items-center">
+      <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-[#FFC119] to-[#FFEB83] text-black font-extrabold grid place-items-center">
         {initials}
       </div>
       <div>
-        <h4 className="text-noir font-semibold">{name}</h4>
-        <p className="text-sm text-[#6B6B6B]">{role}</p>
+        <h4 className="font-semibold">{name}</h4>
+        <p className="text-sm text-white/70">{role}</p>
       </div>
     </m.article>
   );

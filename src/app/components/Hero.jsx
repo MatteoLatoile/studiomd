@@ -1,15 +1,22 @@
 "use client";
-
 import { LazyMotion, domAnimation, m, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { FiArrowRight, FiCalendar } from "react-icons/fi";
-import ImageHero from "../../../public/imge_hero.png";
+import ImageHero from "../../../public/imge_hero.webp"; // convertis-le en .webp/.avif si possible
+import { IconArrowRight, IconCalendar } from "./icons";
 
 const ease = [0.22, 1, 0.36, 1];
+const CATEGORIES = [
+  "Batterie",
+  "Camera",
+  "costume-accesoire",
+  "eclairage",
+  "machinerie",
+  "monitoring",
+  "son",
+];
 
-// petit composant Skeleton avec shimmer
 function Skel({ className = "" }) {
   return (
     <div
@@ -31,21 +38,11 @@ function Skel({ className = "" }) {
   );
 }
 
-const CATEGORIES = [
-  "Caméras",
-  "Audio",
-  "Éclairage",
-  "Vidéo-assist",
-  "Accessoires",
-];
-
-const Hero = () => {
+export default function Hero() {
   const router = useRouter();
   const reduce = useReducedMotion();
   const today = new Date().toISOString().split("T")[0];
   const [imgReady, setImgReady] = useState(false);
-
-  // états du mini-formulaire
   const [category, setCategory] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
@@ -66,7 +63,6 @@ const Hero = () => {
       aria-live="polite"
     >
       <LazyMotion features={domAnimation}>
-        {/* BACKGROUND */}
         <m.div
           className="absolute inset-0 will-change-transform transform-gpu"
           initial={reduce ? false : { scale: 1.08, opacity: 0.9 }}
@@ -88,7 +84,6 @@ const Hero = () => {
             className="object-cover"
             onLoadingComplete={() => setImgReady(true)}
           />
-          {/* Vignette */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
@@ -98,7 +93,6 @@ const Hero = () => {
           />
         </m.div>
 
-        {/* Overlay brut */}
         <div
           aria-hidden
           className="absolute inset-0 mix-blend-multiply"
@@ -109,14 +103,12 @@ const Hero = () => {
           }}
         />
 
-        {/* SKELETON */}
         {!imgReady && (
           <div className="absolute inset-0 z-20 px-6 md:px-20 flex items-center">
             <div className="max-w-xl w-full space-y-6">
               <Skel className="h-3 w-48 rounded-full" />
               <Skel className="h-8 w-4/5 rounded-md" />
               <Skel className="h-3 w-2/3 rounded-full" />
-
               <div className="rounded-2xl p-5 bg-white/10 backdrop-blur-[2px] border border-white/20 space-y-4">
                 <Skel className="h-4 w-24 rounded" />
                 <div className="grid grid-cols-2 gap-3">
@@ -132,7 +124,6 @@ const Hero = () => {
           </div>
         )}
 
-        {/* CONTENU */}
         <m.div
           className="absolute inset-0 flex items-center justify-start px-6 md:px-20 z-10"
           initial={reduce ? false : { opacity: 0, y: 22 }}
@@ -189,11 +180,10 @@ const Hero = () => {
               }
               transition={{ duration: 0.55, ease, delay: 0.26 }}
             >
-              Réservation simple, retrait rapide, packs <br /> optimisés pour le
+              Réservation simple, retrait rapide, packs optimisés pour le
               tournage.
             </m.p>
 
-            {/* Carte recherche */}
             <m.div
               className="rounded-2xl p-5 bg-[#FFFFFF70] backdrop-blur-sm shadow-md border-2 border-white space-y-4 max-w-md"
               whileHover={reduce ? undefined : { y: -2 }}
@@ -202,13 +192,11 @@ const Hero = () => {
               <p className="text-noir font-medium">Matériel</p>
 
               <div className="grid grid-cols-2 gap-3">
-                {/* Catégorie (select) */}
                 <label className="col-span-2 text-[12px] text-noir/80">
-                  Catégorie
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="mt-1 w-full text-sm rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-gray-400 focus:ring-2 focus:ring-[#FFB700]/30"
+                    className="mt-1 w-full text-sm text-gris rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-gray-400 focus:ring-2 focus:ring-[#FFB700]/30"
                   >
                     <option value="">Toutes les catégories</option>
                     {CATEGORIES.map((c) => (
@@ -219,9 +207,8 @@ const Hero = () => {
                   </select>
                 </label>
 
-                {/* Date début */}
                 <label className="flex items-center gap-2 border border-gray-300 px-3 py-2 rounded-lg bg-white focus-within:border-gray-400 focus-within:ring-2 focus-within:ring-[#FFB700]/30">
-                  <FiCalendar className="text-[#FFB700] text-lg" />
+                  <IconCalendar className="h-5 w-5 fill-[#FFB700]" />
                   <input
                     type="date"
                     min={today}
@@ -229,29 +216,26 @@ const Hero = () => {
                     onChange={(e) => {
                       const v = e.target.value;
                       setStart(v);
-                      if (end && v && new Date(end) < new Date(v)) {
-                        setEnd(v);
-                      }
+                      if (end && v && new Date(end) < new Date(v)) setEnd(v);
                     }}
-                    className="w-full text-sm outline-none appearance-none [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                    className="w-full text-sm text-gris outline-none appearance-none"
                   />
                 </label>
 
-                {/* Date fin */}
                 <label className="flex items-center gap-2 border border-gray-300 px-3 py-2 rounded-lg bg-white focus-within:border-gray-400 focus-within:ring-2 focus-within:ring-[#FFB700]/30">
-                  <FiCalendar className="text-[#FFB700] text-lg" />
+                  <IconCalendar className="h-5 w-5 fill-[#FFB700]" />
                   <input
                     type="date"
                     min={start || today}
                     value={end}
                     onChange={(e) => setEnd(e.target.value)}
-                    className="w-full text-sm outline-none appearance-none [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                    className="w-full text-sm text-gris outline-none appearance-none"
                   />
                 </label>
 
                 <m.button
                   onClick={onSearch}
-                  className="col-span-2 bg-[#FFB700] hover:bg-orFonce text-noir font-semibold rounded-lg px-4 py-2"
+                  className="col-span-2 bg-[#FFB700] hover:bg-[#ffc83b] text-noir font-semibold rounded-lg px-4 py-2"
                   whileTap={reduce ? undefined : { scale: 0.98 }}
                 >
                   Recherche
@@ -259,7 +243,7 @@ const Hero = () => {
               </div>
 
               <p className="text-xs text-gris text-center">
-                Matériel vérifié - Devis rapide - Support technique
+                Matériel vérifié — Devis rapide — Support technique
               </p>
 
               <m.button
@@ -267,13 +251,13 @@ const Hero = () => {
                 className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#FFC119] to-[#FFEB83] text-noir font-semibold py-3 rounded-xl shadow"
                 whileTap={reduce ? undefined : { scale: 0.98 }}
               >
-                Voir le catalogue <FiArrowRight className="text-lg" />
+                Voir le catalogue{" "}
+                <IconArrowRight className="h-5 w-5 fill-current" />
               </m.button>
             </m.div>
           </div>
         </m.div>
 
-        {/* Cue scroll */}
         {!reduce && imgReady && (
           <m.div
             className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10"
@@ -297,6 +281,4 @@ const Hero = () => {
       </LazyMotion>
     </section>
   );
-};
-
-export default Hero;
+}

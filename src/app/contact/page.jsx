@@ -58,7 +58,6 @@ export default function ContactPage() {
         throw new Error(data?.error || `HTTP ${res.status}`);
       }
 
-      // succès
       setSent(true);
       setForm({
         name: "",
@@ -78,23 +77,19 @@ export default function ContactPage() {
   };
 
   return (
-    <main className="bg-[#F6EAD1] pt-30 min-h-screen">
+    <main className="bg-[#0B0B0F] pt-30 min-h-screen text-white">
       <div className="max-w-6xl mx-auto px-4 md:px-6 pt-10 pb-24">
-        {/* Titre */}
         <header className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-noir">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
             Formulaire de contact
           </h1>
-          <p className="text-sm text-[#6B6B6B] mt-2 leading-5">
-            Caméras, optiques, audio, lumière… tout l’équipement dont vous avez
-            besoin, prêt à tourner quand vous l’êtes.
+          <p className="text-sm text-white/60 mt-2 leading-5">
+            Caméras, optiques, audio, lumière… prêt à tourner quand vous l’êtes.
           </p>
         </header>
 
-        {/* Grille */}
         <div className="grid md:grid-cols-[1fr_360px] gap-6">
-          {/* Carte formulaire */}
-          <section className="rounded-2xl bg-[#ffffff80] ring-1 ring-black/5 shadow-[0_10px_30px_rgba(0,0,0,0.06)] p-5 md:p-6">
+          <section className="rounded-2xl bg-[#0F1117] ring-1 ring-white/10 shadow-xl p-5 md:p-6">
             <form onSubmit={onSubmit} noValidate className="space-y-4">
               <Field
                 icon={<FiUser className="text-[#FFB700]" />}
@@ -122,7 +117,7 @@ export default function ContactPage() {
                 label="Téléphone"
                 hint="(Optionnel)"
                 name="phone"
-                placeholder="Entrez votre numéro de téléphone ici."
+                placeholder="Numéro de téléphone."
                 value={form.phone}
                 onChange={handleChange}
               />
@@ -131,7 +126,7 @@ export default function ContactPage() {
                 icon={<FiTag className="text-[#FFB700]" />}
                 label="Objet"
                 name="subject"
-                placeholder="Quel est l’objet de votre message ?"
+                placeholder="Objet de votre message ?"
                 value={form.subject}
                 onChange={handleChange}
               />
@@ -140,20 +135,19 @@ export default function ContactPage() {
                 icon={<FiMessageSquare className="text-[#FFB700]" />}
                 label="Message"
                 name="message"
-                placeholder="Tapez votre message dans ce champs."
+                placeholder="Tapez votre message ici."
                 value={form.message}
                 onChange={handleChange}
                 error={errors.message}
               />
 
-              {/* Consentement */}
-              <label className="flex items-start gap-2 text-xs text-[#343434]">
+              <label className="flex items-start gap-2 text-xs text-white/80">
                 <input
                   type="checkbox"
                   name="consent"
                   checked={form.consent}
                   onChange={handleChange}
-                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#FFB700] focus:ring-[#FFB700]"
+                  className="mt-0.5 h-4 w-4 rounded border-white/20 bg-transparent text-[#FFB700] focus:ring-[#FFB700]"
                 />
                 <span>
                   J’accepte que mes données soient utilisées pour être
@@ -161,56 +155,47 @@ export default function ContactPage() {
                 </span>
               </label>
               {errors.consent && (
-                <p className="text-xs text-red-600 -mt-2">{errors.consent}</p>
+                <p className="text-xs text-red-400 -mt-2">{errors.consent}</p>
               )}
 
-              {/* Actions */}
               <div className="pt-2">
                 <button
                   type="submit"
                   disabled={sending}
-                  className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-noir shadow-md disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-black shadow-md disabled:opacity-60"
                   style={{
                     background:
                       "linear-gradient(90deg,#FFC119 0%, #FFEB83 100%)",
                   }}
                 >
                   {sending ? (
-                    <>
-                      <Spinner /> Envoi en cours…
-                    </>
+                    <>Envoi en cours…</>
                   ) : (
                     <>
-                      Soumettre le formulaire <FiSend className="text-base" />
+                      Soumettre le formulaire <FiSend />
                     </>
                   )}
                 </button>
                 {sent && (
-                  <span className="ml-3 text-sm text-green-700">
+                  <span className="ml-3 text-sm text-emerald-400">
                     Merci ! Votre message a bien été envoyé.
                   </span>
                 )}
                 {errors.submit && (
-                  <p className="mt-2 text-sm text-red-600">{errors.submit}</p>
+                  <p className="mt-2 text-sm text-red-400">{errors.submit}</p>
                 )}
               </div>
             </form>
           </section>
 
-          {/* Carte infos & réseaux */}
-          <aside className="rounded-2xl bg-[#ffffff80] ring-1 ring-black/5 shadow-[0_10px_30px_rgba(0,0,0,0.06)] p-5 md:p-6">
-            <h3 className="text-noir font-semibold">
-              Contactez-nous aussi sur :
-            </h3>
-
-            {/* Réseaux */}
+          <aside className="rounded-2xl bg-[#0F1117] ring-1 ring-white/10 shadow-xl p-5 md:p-6">
+            <h3 className="font-semibold">Contactez-nous aussi sur :</h3>
             <div className="mt-3 flex items-center gap-3">
               <Social icon={<BsFacebook />} />
               <Social icon={<BsInstagram />} />
               <Social icon={<BsYoutube />} />
             </div>
 
-            {/* Infos */}
             <div className="mt-6 space-y-4 text-sm">
               <InfoRow
                 title="E-mail"
@@ -229,10 +214,8 @@ export default function ContactPage() {
               />
             </div>
 
-            {/* Notice délai */}
-            <p className="mt-6 text-xs text-[#6B6B6B] leading-5">
-              Nous nous efforçons de répondre à toutes les demandes dans un
-              délai de 24 heures ouvrées.
+            <p className="mt-6 text-xs text-white/60">
+              Nous répondons en général sous 24h ouvrées.
             </p>
           </aside>
         </div>
@@ -241,8 +224,7 @@ export default function ContactPage() {
   );
 }
 
-/* ---------- composants UI ---------- */
-
+/* UI */
 function Field({
   icon,
   label,
@@ -256,35 +238,32 @@ function Field({
 }) {
   return (
     <div>
-      <label className="text-[13px] text-noir flex items-center gap-2 mb-1">
-        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-transparent">
+      <label className="text-[13px] text-white flex items-center gap-2 mb-1">
+        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full">
           {icon}
         </span>
-        {label} {hint && <span className="text-[#6B6B6B] ml-1">{hint}</span>}
+        {label} {hint && <span className="text-white/60 ml-1">{hint}</span>}
       </label>
-
-      <div className="flex items-center gap-2 rounded-lg bg-white border border-gray-300 px-3 py-2 focus-within:border-gray-400 focus-within:ring-2 focus-within:ring-[#FFB700]/30">
+      <div className="flex items-center gap-2 rounded-lg bg-[#0B0D12] border border-white/10 px-3 py-2 focus-within:border-white/20 focus-within:ring-2 focus-within:ring-[#FFB700]/20">
         <input
           type={type}
           name={name}
           placeholder={placeholder}
           value={value}
           onChange={onChange}
-          className="w-full text-sm outline-none placeholder-gray-400"
+          className="w-full text-sm outline-none placeholder-white/30 bg-transparent text-white"
           aria-invalid={!!error}
           aria-describedby={error ? `${name}-error` : undefined}
         />
       </div>
-
       {error && (
-        <p id={`${name}-error`} className="mt-1 text-xs text-red-600">
+        <p id={`${name}-error`} className="mt-1 text-xs text-red-400">
           {error}
         </p>
       )}
     </div>
   );
 }
-
 function FieldTextarea({
   icon,
   label,
@@ -296,45 +275,42 @@ function FieldTextarea({
 }) {
   return (
     <div>
-      <label className="text-[13px] text-noir flex items-center gap-2 mb-1">
-        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-transparent">
+      <label className="text-[13px] text-white flex items-center gap-2 mb-1">
+        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full">
           {icon}
         </span>
         {label}
       </label>
-
-      <div className="rounded-lg bg-white border border-gray-300 p-2 focus-within:border-gray-400 focus-within:ring-2 focus-within:ring-[#FFB700]/30">
+      <div className="rounded-lg bg-[#0B0D12] border border-white/10 p-2 focus-within:border-white/20 focus-within:ring-2 focus-within:ring-[#FFB700]/20">
         <textarea
           name={name}
           rows={5}
           placeholder={placeholder}
           value={value}
           onChange={onChange}
-          className="w-full text-sm outline-none placeholder-gray-400 resize-y min-h-[120px]"
+          className="w-full text-sm outline-none placeholder-white/30 bg-transparent text-white resize-y min-h-[120px]"
           aria-invalid={!!error}
           aria-describedby={error ? `${name}-error` : undefined}
         />
       </div>
-
       {error && (
-        <p id={`${name}-error`} className="mt-1 text-xs text-red-600">
+        <p id={`${name}-error`} className="mt-1 text-xs text-red-400">
           {error}
         </p>
       )}
     </div>
   );
 }
-
 function InfoRow({ title, lines, icon }) {
   return (
     <div>
-      <p className="text-noir font-semibold flex items-center gap-2">
+      <p className="font-semibold flex items-center gap-2">
         <span className="inline-flex h-5 w-5 items-center justify-center">
           {icon}
         </span>
         {title}
       </p>
-      <div className="mt-1 text-[#6B6B6B] leading-5">
+      <div className="mt-1 text-white/70 leading-5">
         {lines.map((l, i) => (
           <p key={i}>{l}</p>
         ))}
@@ -342,24 +318,14 @@ function InfoRow({ title, lines, icon }) {
     </div>
   );
 }
-
 function Social({ icon }) {
   return (
     <button
       type="button"
-      className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#FFB700] text-noir hover:opacity-90 transition shadow"
+      className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#FFB700] text-black hover:opacity-90 transition shadow"
       aria-label="Réseau social"
     >
       <span className="text-lg">{icon}</span>
     </button>
-  );
-}
-
-function Spinner() {
-  return (
-    <span
-      className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-black"
-      aria-hidden
-    />
   );
 }

@@ -3,6 +3,8 @@ import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic"; // ✅ évite un cache qui varie selon l'état de connexion
+
 // Utils
 function safeNumber(v, def = 0) {
   const n = parseFloat(String(v));
@@ -28,6 +30,74 @@ function parseTags(raw) {
   }
 }
 
+/**
+ * ✅ Normalise la valeur `tags` en TABLEAU DE STRINGS pour la réponse API,
+ * quel que soit le type stocké en base (jsonb, text[], text, string JSON, etc.).
+ */
+function normalizeTagsOut(raw) {
+  if (!raw && raw !== "") return [];
+  // Déjà un tableau JS
+  if (Array.isArray(raw)) {
+    return raw.map((t) => String(t).trim()).filter(Boolean);
+  }
+  // String JSON: '["a","b"]'
+  if (typeof raw === "string" && raw.trim().startsWith("[")) {
+    try {
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr)
+        ? arr.map((t) => String(t).trim()).filter(Boolean)
+        : [];
+    } catch {
+      // fallthrough
+    }
+  }
+  // Postgres text[] sérialisé: "{a,b}" ou {"a","b"}
+  if (
+    typeof raw === "string" &&
+    raw.trim().startsWith("{") &&
+    raw.trim().endsWith("}")
+  ) {
+    const inner = raw.trim().slice(1, -1);
+    if (!inner) return [];
+    const parts = [];
+    let current = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < inner.length; i++) {
+      const ch = inner[i];
+      if (ch === '"') {
+        inQuotes = !inQuotes;
+        continue;
+      }
+      if (ch === "," && !inQuotes) {
+        parts.push(current);
+        current = "";
+        continue;
+      }
+      current += ch;
+    }
+    if (current) parts.push(current);
+
+    return parts
+      .map((s) => s.replace(/^"(.*)"$/, "$1"))
+      .map((s) => s.replace(/\\"/g, '"'))
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  // Fallback: cast to string unique si présent
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    if (!t) return [];
+    return [t];
+  }
+  return [];
+}
+
+function normalizeProductOut(p) {
+  if (!p) return p;
+  return { ...p, tags: normalizeTagsOut(p.tags) };
+}
+
 // (optionnel) GET: pratique pour tester vite fait en local
 export async function GET() {
   const supabase = createRouteHandlerClient({ cookies });
@@ -41,7 +111,10 @@ export async function GET() {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ data }, { status: 200 });
+
+  // ✅ normaliser les tags en sortie
+  const safe = Array.isArray(data) ? data.map(normalizeProductOut) : [];
+  return NextResponse.json({ data: safe }, { status: 200 });
 }
 
 export async function POST(req) {
@@ -73,7 +146,7 @@ export async function POST(req) {
       parseInt(String(form.get("stock") ?? "0"), 10) || 0
     );
 
-    // Tags
+    // Tags (reçus en JSON string côté form)
     const tags = parseTags(form.get("tags"));
 
     // Fichier image
@@ -137,7 +210,11 @@ export async function POST(req) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ data }, { status: 201 });
+    // ✅ normaliser les tags en sortie
+    return NextResponse.json(
+      { data: normalizeProductOut(data) },
+      { status: 201 }
+    );
   } catch (e) {
     return NextResponse.json(
       { error: e?.message || "Erreur serveur" },

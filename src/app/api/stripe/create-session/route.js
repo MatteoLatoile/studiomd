@@ -1,8 +1,8 @@
 export const dynamic = "force-dynamic";
 
-import { cookies } from "next/headers";
+import { stripe } from "@/app/lib/cawl";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { stripe } from "@/app/lib/stripe";
+import { cookies } from "next/headers";
 
 /** nb de jours (inclusif) entre 2 dates ISO (YYYY-MM-DD) */
 function daysInclusive(a, b) {

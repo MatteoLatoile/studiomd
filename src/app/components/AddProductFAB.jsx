@@ -89,7 +89,7 @@ export default function AddProductFAB({ isAdmin, categories = [], onCreated }) {
       <button
         onClick={() => setOpen(true)}
         className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 h-16 w-16 rounded-full shadow-xl cursor-pointer
-                   flex items-center justify-center text-3xl text-black"
+                   flex items-center justify-center text-3xl text-noir"
         style={{
           background: "linear-gradient(135deg,#FFC119 0%,#FFEB83 100%)",
         }}
@@ -100,13 +100,15 @@ export default function AddProductFAB({ isAdmin, categories = [], onCreated }) {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-4 sticky top-0 bg-white pb-2">
-              <h2 className="text-xl font-semibold">Ajouter un produit</h2>
+        <div className="fixed inset-0 z-50 flex text-black items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto text-black rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4 text-black sticky top-0 bg-white pb-2">
+              <h2 className="text-xl text-black font-semibold">
+                Ajouter un produit
+              </h2>
               <button
                 onClick={() => setOpen(false)}
-                className="text-2xl leading-none cursor-pointer"
+                className="text-2xl text-black leading-none cursor-pointer"
               >
                 &times;
               </button>
@@ -119,7 +121,9 @@ export default function AddProductFAB({ isAdmin, categories = [], onCreated }) {
             >
               <div className="grid grid-cols-2 gap-4">
                 <label className="col-span-2">
-                  <span className="block text-sm font-medium">Image</span>
+                  <span className="block text-black text-sm font-medium">
+                    Image
+                  </span>
                   <input
                     name="image"
                     type="file"
@@ -130,26 +134,32 @@ export default function AddProductFAB({ isAdmin, categories = [], onCreated }) {
                 </label>
 
                 <label className="col-span-2">
-                  <span className="block text-sm font-medium">Nom</span>
+                  <span className="block text-sm text-black font-medium">
+                    Nom
+                  </span>
                   <input
                     name="name"
                     required
-                    className="mt-1 w-full rounded-lg border p-2"
+                    className="mt-1 w-full text-black rounded-lg border p-2"
                   />
                 </label>
 
                 <label className="col-span-2">
-                  <span className="block text-sm font-medium">Description</span>
+                  <span className="block text-sm text-black font-medium">
+                    Description
+                  </span>
                   <textarea
                     name="description"
                     rows={3}
                     required
-                    className="mt-1 w-full rounded-lg border p-2"
+                    className="mt-1 w-full text-black rounded-lg border p-2"
                   />
                 </label>
 
                 <label>
-                  <span className="block text-sm font-medium">Prix (€)</span>
+                  <span className="block text-black text-sm font-medium">
+                    Prix (€)
+                  </span>
                   <input
                     name="price"
                     type="number"

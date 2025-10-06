@@ -3,6 +3,8 @@ import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic"; // ✅ évite un cache qui varie selon l'état de connexion
+
 function safeNumber(v, def = 0) {
   const n = parseFloat(String(v));
   return Number.isFinite(n) ? n : def;
@@ -25,6 +27,68 @@ function parseTags(raw) {
   } catch {
     return [];
   }
+}
+
+/**
+ * ✅ Normalise la valeur `tags` en TABLEAU DE STRINGS pour la réponse API.
+ * (jsonb, text[], text, string JSON → toujours string[])
+ */
+function normalizeTagsOut(raw) {
+  if (!raw && raw !== "") return [];
+  if (Array.isArray(raw)) {
+    return raw.map((t) => String(t).trim()).filter(Boolean);
+  }
+  if (typeof raw === "string" && raw.trim().startsWith("[")) {
+    try {
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr)
+        ? arr.map((t) => String(t).trim()).filter(Boolean)
+        : [];
+    } catch {}
+  }
+  if (
+    typeof raw === "string" &&
+    raw.trim().startsWith("{") &&
+    raw.trim().endsWith("}")
+  ) {
+    const inner = raw.trim().slice(1, -1);
+    if (!inner) return [];
+    const parts = [];
+    let current = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < inner.length; i++) {
+      const ch = inner[i];
+      if (ch === '"') {
+        inQuotes = !inQuotes;
+        continue;
+      }
+      if (ch === "," && !inQuotes) {
+        parts.push(current);
+        current = "";
+        continue;
+      }
+      current += ch;
+    }
+    if (current) parts.push(current);
+
+    return parts
+      .map((s) => s.replace(/^"(.*)"$/, "$1"))
+      .map((s) => s.replace(/\\"/g, '"'))
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    if (!t) return [];
+    return [t];
+  }
+  return [];
+}
+
+function normalizeProductOut(p) {
+  if (!p) return p;
+  return { ...p, tags: normalizeTagsOut(p.tags) };
 }
 
 export async function PUT(req, { params }) {
@@ -73,7 +137,7 @@ export async function PUT(req, { params }) {
     const category = form.get("category");
     if (category !== null) update.category = String(category).trim();
 
-    // ✅ bloc STOCK (celui que tu as demandé)
+    // ✅ bloc STOCK
     const rawStock = form.get("stock");
     if (rawStock !== null) {
       const s = String(rawStock).trim();
@@ -83,9 +147,11 @@ export async function PUT(req, { params }) {
       }
     }
 
-    // Tags
-    const tags = parseTags(form.get("tags"));
-    if (tags) update.tags = tags;
+    // Tags (reçus en JSON string) — IMPORTANT: on met à jour même si [].
+    if (form.has("tags")) {
+      const tags = parseTags(form.get("tags"));
+      update.tags = tags;
+    }
 
     // si une nouvelle image est fournie → upload + nettoyer l’ancienne
     const imageFile = form.get("image");
@@ -143,7 +209,11 @@ export async function PUT(req, { params }) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ data }, { status: 200 });
+    // ✅ normaliser les tags en sortie
+    return NextResponse.json(
+      { data: normalizeProductOut(data) },
+      { status: 200 }
+    );
   } catch (e) {
     return NextResponse.json(
       { error: e?.message || "Erreur serveur" },

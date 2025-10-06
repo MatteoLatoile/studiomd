@@ -48,17 +48,17 @@ export default function ConnexionPage() {
   };
 
   return (
-    <main className="bg-[#F6EAD1] pt-30 min-h-screen">
+    <main className="bg-[#0B0B0F] pt-30 min-h-screen text-white">
       <div className="max-w-lg mx-auto px-4 md:px-6 pt-12 pb-24">
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-noir">
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
           Connexion
         </h1>
-        <p className="text-sm text-[#6B6B6B] mt-2">Ravi de vous revoir.</p>
+        <p className="text-sm text-white/60 mt-2">Ravi de vous revoir.</p>
 
         <form
           onSubmit={onSubmit}
           noValidate
-          className="mt-8 space-y-4 rounded-2xl bg-[#ffffff80] ring-1 ring-black/5 shadow-[0_10px_30px_rgba(0,0,0,0.06)] p-6"
+          className="mt-8 space-y-4 rounded-2xl bg-[#0F1117] ring-1 ring-white/10 shadow-xl p-6"
         >
           <Field label="E-mail" icon={<FiMail className="text-[#FFB700]" />}>
             <input
@@ -70,7 +70,7 @@ export default function ConnexionPage() {
               value={form.email}
               onChange={onChange}
               placeholder="votre@email.com"
-              className="input"
+              className="w-full bg-transparent outline-none text-white placeholder-white/30"
               aria-invalid={!!error}
             />
           </Field>
@@ -86,17 +86,18 @@ export default function ConnexionPage() {
               autoComplete="current-password"
               required
               placeholder="Votre mot de passe"
+              className="w-full bg-transparent outline-none text-white placeholder-white/30"
             />
           </Field>
 
-          <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center justify-between text-xs text-white/80">
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
                 name="remember"
                 checked={form.remember}
                 onChange={onChange}
-                className="h-4 w-4 rounded border-gray-300 text-[#FFB700] focus:ring-[#FFB700]"
+                className="h-4 w-4 rounded border-white/20 bg-transparent text-[#FFB700] focus:ring-[#FFB700]"
               />
               Se souvenir de moi
             </label>
@@ -105,10 +106,17 @@ export default function ConnexionPage() {
             </Link>
           </div>
 
-          {error && <p className="err">{error}</p>}
+          {error && <p className="text-sm text-red-400">{error}</p>}
 
           <div className="pt-2">
-            <button type="submit" disabled={submitting} className="btn-primary">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="inline-flex items-center gap-2 rounded-2xl px-10 py-4 text-sm font-medium text-black shadow hover:opacity-90 transition"
+              style={{
+                background: "linear-gradient(90deg,#FFC119 0%, #FFEB83 100%)",
+              }}
+            >
               {submitting ? (
                 "Connexion…"
               ) : (
@@ -119,7 +127,7 @@ export default function ConnexionPage() {
             </button>
           </div>
 
-          <p className="text-sm text-[#6B6B6B]">
+          <p className="text-sm text-white/60">
             Nouveau ?{" "}
             <Link href="/inscription" className="underline">
               Créer un compte
@@ -134,11 +142,11 @@ export default function ConnexionPage() {
 function Field({ label, icon, children }) {
   return (
     <div>
-      <label className="text-[13px] text-noir flex items-center gap-2 mb-1">
+      <label className="text-[13px] text-white flex items-center gap-2 mb-1">
         {icon}
         {label}
       </label>
-      <div className="flex items-center gap-2 rounded-lg bg-white border border-gray-300 px-3 py-2 focus-within:border-gray-400 focus-within:ring-2 focus-within:ring-[#FFB700]/30">
+      <div className="flex items-center gap-2 rounded-lg bg-[#0B0D12] border border-white/10 px-3 py-2 focus-within:border-white/20 focus-within:ring-2 focus-within:ring-[#FFB700]/20">
         {children}
       </div>
     </div>

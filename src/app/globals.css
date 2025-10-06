@@ -27,3 +27,6 @@ body {
 .text-noir {
   color: #0a0a0a;
 }
+.text-gris {
+  color: rgb(78, 78, 78);
+}

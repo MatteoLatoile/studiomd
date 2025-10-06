@@ -1,17 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { FiEdit2 } from "react-icons/fi";
-
-const CATEGORIES = [
-  "Batterie",
-  "Camera",
-  "costume-accesoire",
-  "eclairage",
-  "machinerie",
-  "monitoring",
-  "son",
-];
+import { useEffect, useMemo, useState } from "react";
+import { FiEdit2, FiPlus, FiX } from "react-icons/fi";
 
 export default function EditProductButton({
   product,
@@ -23,34 +13,29 @@ export default function EditProductButton({
   const [err, setErr] = useState(null);
   const [preview, setPreview] = useState(product.image_url || "");
 
-  // Tags UI
+  // TAGS local state
   const [tagInput, setTagInput] = useState("");
-  const [tags, setTags] = useState(
-    Array.isArray(product?.tags) ? product.tags : []
-  );
+  const [tags, setTags] = useState([]);
 
-  const sortedCats = useMemo(() => {
-    const base = CATEGORIES.length ? CATEGORIES : categories;
-    return Array.from(new Set(base.filter(Boolean)));
-  }, [categories]);
+  useEffect(() => {
+    setTags(Array.isArray(product.tags) ? product.tags : []);
+  }, [product.tags]);
+
+  const sortedCats = useMemo(
+    () => Array.from(new Set(categories.filter(Boolean))).sort(),
+    [categories]
+  );
 
   const catInList = sortedCats.includes(product.category);
 
   function addTag() {
     const t = tagInput.trim();
     if (!t) return;
-    if (tags.includes(t)) return;
-    setTags((prev) => [...prev, t]);
+    if (!tags.includes(t)) setTags((prev) => [...prev, t]);
     setTagInput("");
   }
-  function removeTag(idx) {
-    setTags((prev) => prev.filter((_, i) => i !== idx));
-  }
-  function onTagKey(e) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      addTag();
-    }
+  function removeTag(t) {
+    setTags((prev) => prev.filter((x) => x !== t));
   }
 
   async function handleSubmit(e) {
@@ -61,18 +46,20 @@ export default function EditProductButton({
     const formEl = e.currentTarget;
     const fd = new FormData(formEl);
 
+    // category "Autre…"
     if (fd.get("category") === "__other__") {
       fd.set("category", (fd.get("other_category") || "").toString().trim());
     }
     fd.delete("other_category");
 
+    // stock >= 0
     const stock = Math.max(
       0,
       parseInt(fd.get("stock") ?? product.stock ?? 0, 10) || 0
     );
     fd.set("stock", String(stock));
 
-    // 👉 envoyer la liste de tags mise à jour
+    // tags en JSON
     fd.set("tags", JSON.stringify(tags));
 
     try {
@@ -108,10 +95,9 @@ export default function EditProductButton({
 
   return (
     <>
-      {/* Bouton modifier */}
       <button
         onClick={() => setOpen(true)}
-        className="rounded-full px-3 py-1 text-xs font-semibold shadow cursor-pointer
+        className="rounded-full text-black px-3 py-1 text-xs font-semibold shadow cursor-pointer
                    bg-white/90 hover:bg-white ring-1 ring-black/10"
         title="Modifier"
         aria-label="Modifier"
@@ -122,7 +108,7 @@ export default function EditProductButton({
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-[100] text-black flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-xl max-h-[85vh] overflow-auto rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4 sticky top-0 bg-white">
               <h2 className="text-xl font-semibold">Modifier le produit</h2>
@@ -139,7 +125,7 @@ export default function EditProductButton({
               encType="multipart/form-data"
               className="space-y-4"
             >
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 text-black gap-4">
                 <div className="col-span-2">
                   <span className="block text-sm font-medium">Image</span>
                   {preview ? (
@@ -162,7 +148,9 @@ export default function EditProductButton({
                 </div>
 
                 <label className="col-span-2">
-                  <span className="block text-sm font-medium">Nom</span>
+                  <span className="block text-sm text-black font-medium">
+                    Nom
+                  </span>
                   <input
                     name="name"
                     defaultValue={product.name}
@@ -172,18 +160,22 @@ export default function EditProductButton({
                 </label>
 
                 <label className="col-span-2">
-                  <span className="block text-sm font-medium">Description</span>
+                  <span className="block text-sm text-black font-medium">
+                    Description
+                  </span>
                   <textarea
                     name="description"
                     defaultValue={product.description}
                     rows={3}
                     required
-                    className="mt-1 w-full rounded-lg border p-2"
+                    className="mt-1 w-full text-black rounded-lg border p-2"
                   />
                 </label>
 
                 <label>
-                  <span className="block text-sm font-medium">Prix (€)</span>
+                  <span className="block text-black text-sm font-medium">
+                    Prix (€)
+                  </span>
                   <input
                     name="price"
                     type="number"
@@ -191,12 +183,14 @@ export default function EditProductButton({
                     min="0"
                     defaultValue={Number(product.price)}
                     required
-                    className="mt-1 w-full rounded-lg border p-2"
+                    className="mt-1 w-full text-black rounded-lg border p-2"
                   />
                 </label>
 
                 <label>
-                  <span className="block text-sm font-medium">Stock</span>
+                  <span className="block text-black text-sm font-medium">
+                    Stock
+                  </span>
                   <input
                     name="stock"
                     type="number"
@@ -204,15 +198,17 @@ export default function EditProductButton({
                     step="1"
                     defaultValue={Number(product.stock ?? 0)}
                     required
-                    className="mt-1 w-full rounded-lg border p-2"
+                    className="mt-1 text-black w-full rounded-lg border p-2"
                   />
                 </label>
 
                 <div>
-                  <span className="block text-sm font-medium">Catégorie</span>
+                  <span className="block text-black text-sm font-medium">
+                    Catégorie
+                  </span>
                   <select
                     name="category"
-                    className="mt-1 w-full rounded-lg border p-2"
+                    className="mt-1 w-full text-black rounded-lg border p-2"
                     defaultValue={catInList ? product.category : "__other__"}
                     onChange={(e) => {
                       const otherRow = document.getElementById(
@@ -240,12 +236,12 @@ export default function EditProductButton({
                   id={`other-cat-${product.id}`}
                   style={{ display: catInList ? "none" : "block" }}
                 >
-                  <span className="block text-sm font-medium">
+                  <span className="block text-black text-sm font-medium">
                     Nouvelle catégorie
                   </span>
                   <input
                     name="other_category"
-                    className="mt-1 w-full rounded-lg border p-2"
+                    className="mt-1 text-black w-full rounded-lg border p-2"
                     placeholder="ex: Accessoires"
                     defaultValue={catInList ? "" : product.category}
                   />
@@ -253,44 +249,45 @@ export default function EditProductButton({
 
                 {/* TAGS */}
                 <div className="col-span-2">
-                  <span className="block text-sm font-medium">Tags</span>
-                  <div className="mt-1 flex gap-2">
+                  <span className="block text-black text-sm font-medium">
+                    Tags
+                  </span>
+                  <div className="flex text-black items-center gap-2 mt-1">
                     <input
-                      type="text"
                       value={tagInput}
                       onChange={(e) => setTagInput(e.target.value)}
-                      onKeyDown={onTagKey}
-                      placeholder="ex: 4K, XLR, Vmount…"
-                      className="flex-1 rounded-lg border p-2 text-sm"
+                      placeholder="ex: 4K, XLR, compact…"
+                      className="flex-1 text-black rounded-lg border p-2 text-sm"
                     />
                     <button
                       type="button"
                       onClick={addTag}
-                      className="px-3 py-2 rounded-lg text-black font-semibold cursor-pointer shadow"
+                      className="inline-flex text-black items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium cursor-pointer"
                       style={{
                         background:
                           "linear-gradient(90deg,#FFC119 0%, #FFEB83 100%)",
                       }}
                     >
-                      Ajouter
+                      <FiPlus /> Ajouter
                     </button>
                   </div>
+
                   {tags.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {tags.map((t, idx) => (
+                    <div className="flex text-black flex-wrap gap-1.5 mt-2">
+                      {tags.map((t) => (
                         <span
-                          key={`${t}-${idx}`}
-                          className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-[#E9F0FF] ring-1 ring-[#B9CEFF]/70"
+                          key={t}
+                          className="inline-flex text-black items-center gap-1 text-[11px] px-2 py-1 rounded-full bg-[#FFF3C4] ring-1 ring-[#FFD966]/70"
                         >
                           {t}
                           <button
                             type="button"
-                            onClick={() => removeTag(idx)}
-                            className="ml-1 text-xs leading-none"
-                            aria-label={`Supprimer ${t}`}
-                            title="Supprimer"
+                            onClick={() => removeTag(t)}
+                            className="opacity-70 text-black hover:opacity-100"
+                            aria-label={`Retirer ${t}`}
+                            title={`Retirer ${t}`}
                           >
-                            ×
+                            <FiX />
                           </button>
                         </span>
                       ))}

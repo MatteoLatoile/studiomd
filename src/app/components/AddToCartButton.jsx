@@ -65,7 +65,7 @@ export default function AddToCartButton({ productId }) {
       <button
         onClick={() => setOpen(true)}
         disabled={adding}
-        className="w-full flex items-center justify-center gap-2 py-2 rounded-lg font-semibold text-noir shadow-md text-sm hover:opacity-90 transition cursor-pointer"
+        className="w-full flex items-center justify-center gap-2 py-2 rounded-lg font-semibold text-black shadow-md text-sm hover:opacity-90 transition cursor-pointer"
         style={{
           background: "linear-gradient(90deg,#FFC119 0%, #FFEB83 100%)",
         }}

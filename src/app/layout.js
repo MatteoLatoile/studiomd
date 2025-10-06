@@ -1,4 +1,6 @@
 import { Roboto } from "next/font/google";
+import AnalyticsLoader from "./components/AnalyticsLoader";
+import CookieBanner from "./components/CookieBanner";
 import Footer from "./components/Footer";
 import Header from "./components/Header";
 import "./globals.css";
@@ -21,6 +23,8 @@ export default function RootLayout({ children }) {
       <body className={roboto.className}>
         <Header />
         <main>{children}</main>
+        <CookieBanner />
+        <AnalyticsLoader />
         <Footer />
       </body>
     </html>

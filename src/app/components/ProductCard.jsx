@@ -1,5 +1,4 @@
-"use client";
-
+import { useState } from "react";
 import { FiBox } from "react-icons/fi";
 import AddToCartButton from "./AddToCartButton";
 import DeleteProductButton from "./DeleteProductButton";
@@ -14,6 +13,7 @@ export default function ProductCard({
 }) {
   const hasImage = Boolean(product?.image_url);
   const tags = Array.isArray(product?.tags) ? product.tags : [];
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   return (
     <div className="relative bg-white rounded-xl shadow p-4 space-y-2 ring-1 ring-[#f5e8c7]">
@@ -37,12 +37,22 @@ export default function ProductCard({
 
       <div className="flex justify-center items-center h-36">
         {hasImage ? (
-          <img
-            src={product.image_url}
-            alt={product.name}
-            className="h-36 w-full object-contain rounded-lg"
-            loading="lazy"
-          />
+          <div className="h-36 w-full">
+            {/* skeleton d'image */}
+            {!imgLoaded && (
+              <div className="h-36 w-full rounded-lg bg-black/5 animate-pulse" />
+            )}
+            <img
+              src={product.image_url}
+              alt={product.name}
+              className={`h-36 w-full object-contain rounded-lg transition-opacity duration-300 ${
+                imgLoaded ? "opacity-100" : "opacity-0"
+              }`}
+              loading="lazy"
+              onLoad={() => setImgLoaded(true)}
+              onError={() => setImgLoaded(true)}
+            />
+          </div>
         ) : (
           <FiBox className="text-6xl text-gray-400" />
         )}
@@ -57,14 +67,14 @@ export default function ProductCard({
         </p>
       </div>
 
-      {/* Tags */}
+      {/* Tags (si présents) */}
       {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-1">
+        <div className="flex flex-wrap text-black gap-1.5 mt-1">
           {tags.map((t, i) => (
             <span
               key={`${t}-${i}`}
-              className="text-[11px] px-2 py-0.5 rounded-full bg-[#FFF3C4] ring-1 ring-[#FFD966]/70 text-noir"
-              title={`Tag: ${t}`}
+              className="text-[10px] px-2 py-0.5 rounded-full bg-[#FFF3C4] ring-1 ring-[#FFD966]/70"
+              title={t}
             >
               {t}
             </span>

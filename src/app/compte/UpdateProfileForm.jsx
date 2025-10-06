@@ -24,7 +24,6 @@ export default function UpdateProfileForm({
     setErr(null);
 
     try {
-      // upsert profil (id = auth.users.id)
       const { error } = await supabase.from("profiles").upsert(
         {
           id: userId,
@@ -44,56 +43,56 @@ export default function UpdateProfileForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-4 text-white">
       {/* Email readonly */}
       <div>
-        <label className="text-[13px] text-noir mb-1 block">E-mail</label>
+        <label className="text-[13px] text-white mb-1 block">E-mail</label>
         <input
           type="email"
           value={email}
           readOnly
-          className="w-full text-sm bg-gray-100/70 border border-gray-300 rounded-lg px-3 py-2"
+          className="w-full text-sm bg-white/5 text-white/80 border border-white/10 rounded-lg px-3 py-2"
         />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="text-[13px] text-noir mb-1 block">Prénom</label>
+          <label className="text-[13px] text-white mb-1 block">Prénom</label>
           <input
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
             placeholder="Votre prénom"
-            className="w-full text-sm bg-white border border-gray-300 rounded-lg px-3 py-2 focus:border-gray-400 focus:ring-2 focus:ring-[#FFB700]/30 outline-none"
+            className="w-full text-sm bg-[#0B0D12] text-white placeholder-white/40 border border-white/10 rounded-lg px-3 py-2 focus:border-white/20 focus:ring-2 focus:ring-[#FFB700]/20 outline-none"
           />
         </div>
         <div>
-          <label className="text-[13px] text-noir mb-1 block">Nom</label>
+          <label className="text-[13px] text-white mb-1 block">Nom</label>
           <input
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
             placeholder="Votre nom"
-            className="w-full text-sm bg-white border border-gray-300 rounded-lg px-3 py-2 focus:border-gray-400 focus:ring-2 focus:ring-[#FFB700]/30 outline-none"
+            className="w-full text-sm bg-[#0B0D12] text-white placeholder-white/40 border border-white/10 rounded-lg px-3 py-2 focus:border-white/20 focus:ring-2 focus:ring-[#FFB700]/20 outline-none"
           />
         </div>
       </div>
 
       <div>
-        <label className="text-[13px] text-noir mb-1 block">Téléphone</label>
+        <label className="text-[13px] text-white mb-1 block">Téléphone</label>
         <input
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           placeholder="Numéro (optionnel)"
-          className="w-full text-sm bg-white border border-gray-300 rounded-lg px-3 py-2 focus:border-gray-400 focus:ring-2 focus:ring-[#FFB700]/30 outline-none"
+          className="w-full text-sm bg-[#0B0D12] text-white placeholder-white/40 border border-white/10 rounded-lg px-3 py-2 focus:border-white/20 focus:ring-2 focus:ring-[#FFB700]/20 outline-none"
         />
       </div>
 
-      {msg && <p className="text-sm text-green-700">{msg}</p>}
-      {err && <p className="text-sm text-red-700">{err}</p>}
+      {msg && <p className="text-sm text-emerald-400">{msg}</p>}
+      {err && <p className="text-sm text-red-400">{err}</p>}
 
       <button
         type="submit"
         disabled={saving}
-        className="rounded-xl px-5 py-3 font-semibold text-noir shadow disabled:opacity-60"
+        className="rounded-xl px-5 py-3 font-semibold text-black shadow disabled:opacity-60"
         style={{
           background: "linear-gradient(90deg,#FFC119 0%, #FFEB83 100%)",
         }}

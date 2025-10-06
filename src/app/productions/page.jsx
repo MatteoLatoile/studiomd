@@ -1,13 +1,10 @@
 "use client";
 
 import { LazyMotion, domAnimation, m } from "framer-motion";
-import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { BsInstagram, BsLinkedin, BsYoutube } from "react-icons/bs";
-import Black from "../../../public/affiches/black.png";
-import Fardeau from "../../../public/affiches/fardeau.png";
-import Sil from "../../../public/affiches/sil.png";
-import Sunshine from "../../../public/affiches/sunshine.png";
+import { supabase } from "../lib/supabase"; // ← même import que tes autres pages
 
 const ease = [0.22, 1, 0.36, 1];
 
@@ -25,41 +22,54 @@ const stagger = {
   show: { transition: { staggerChildren: 0.12, delayChildren: 0.04 } },
 };
 
-const productions = [
-  {
-    id: 1,
-    title: "FARDEAU",
-    author: "Naïl Bouhamadi",
-    img: Fardeau,
-    href: "/fardeau",
-  },
-  {
-    id: 2,
-    title: "You Are My Sunshine",
-    author: "Preiya Dovel",
-    img: Sunshine,
-    href: "/you_are_my_sunshine",
-  },
-  {
-    id: 3,
-    title: "Silhouette",
-    author: "Kendrick Courant",
-    img: Sil,
-    href: "/silhouette",
-  },
-  {
-    id: 4,
-    title: "Black Case",
-    author: "Julien Bompart",
-    img: Black,
-    href: "/black_case",
-  },
-];
+export default function ProductionsPage() {
+  const [films, setFilms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [user, setUser] = useState(null);
 
-export default function Productions() {
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      setLoading(true);
+      setErr(null);
+
+      const { data: u } = await supabase.auth.getUser();
+      if (alive) setUser(u?.user || null);
+
+      const { data, error } = await supabase
+        .from("films")
+        .select(
+          "id, slug, title, director, category, year, runtime_min, poster_url"
+        )
+        .order("created_at", { ascending: false });
+
+      if (!alive) return;
+      if (error) {
+        setErr(error.message);
+        setFilms([]);
+      } else {
+        setFilms(data || []);
+      }
+      setLoading(false);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const isAdmin = !!user?.app_metadata?.is_admin;
+
+  const stats = useMemo(() => {
+    const count = films.length;
+    const now = new Date().getFullYear();
+    const current = films.filter((f) => (f?.year || 0) >= now).length;
+    return { count, current };
+  }, [films]);
+
   return (
     <main className="relative min-h-screen bg-[#0A0A0D] text-white overflow-hidden">
-      {/* décor léger: halos + grain */}
+      {/* halos + grain */}
       <div className="pointer-events-none absolute -top-40 -left-40 h-[520px] w-[520px] rounded-full bg-[#FFB700]/10 blur-3xl" />
       <div className="pointer-events-none absolute top-1/3 -right-40 h-[420px] w-[420px] rounded-full bg-[#FFB700]/5 blur-3xl" />
       <div
@@ -97,12 +107,16 @@ export default function Productions() {
             className="mt-10 grid gap-8 md:grid-cols-3 items-center"
           >
             <m.div variants={fadeUp} className="text-center md:text-left">
-              <p className="text-5xl font-extrabold">+350&nbsp;000</p>
-              <p className="text-white/70">Spectateurs</p>
+              <p className="text-5xl font-extrabold">
+                {stats.count.toString().padStart(2, "0")}
+              </p>
+              <p className="text-white/70">Films publiés</p>
             </m.div>
             <m.div variants={fadeUp} className="text-center">
-              <p className="text-5xl font-extrabold">2</p>
-              <p className="text-white/70">Films en cours</p>
+              <p className="text-5xl font-extrabold">
+                {stats.current.toString().padStart(2, "0")}
+              </p>
+              <p className="text-white/70">En cours</p>
             </m.div>
             <m.div
               variants={fadeUp}
@@ -111,7 +125,7 @@ export default function Productions() {
               <Social
                 icon={<BsLinkedin />}
                 label="LinkedIn"
-                href="https://www.linkedin.com"
+                href="https://www.linkedin.com/company/studio-mont-d-or/"
               />
               <Social
                 icon={<BsYoutube />}
@@ -139,20 +153,42 @@ export default function Productions() {
             Sélection
           </m.h2>
 
-          <m.div
-            variants={stagger}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, amount: 0.2 }}
-            className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4"
-          >
-            {productions.map((p, i) => (
-              <PosterCard key={p.id} p={p} i={i} />
-            ))}
-          </m.div>
+          {loading && (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl bg-[#111118] ring-1 ring-white/10 h-[340px] animate-pulse"
+                />
+              ))}
+            </div>
+          )}
+
+          {err && (
+            <p className="text-sm text-red-400">Erreur de chargement : {err}</p>
+          )}
+
+          {!loading && !err && (
+            <m.div
+              variants={stagger}
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true, amount: 0.2 }}
+              className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4"
+            >
+              {films.map((f, i) => (
+                <PosterCard key={f.id} f={f} i={i} isAdmin={isAdmin} />
+              ))}
+              {films.length === 0 && (
+                <p className="text-white/60 text-sm">
+                  Aucun film pour le moment.
+                </p>
+              )}
+            </m.div>
+          )}
         </section>
 
-        {/* PROCESS (léger) */}
+        {/* APPROCHE */}
         <section className="px-4 md:px-8 lg:px-20 pb-20">
           <m.h2
             variants={fadeUp}
@@ -237,7 +273,10 @@ function Social({ icon, href, label }) {
   );
 }
 
-function PosterCard({ p, i }) {
+function PosterCard({ f, i, isAdmin }) {
+  const fallback =
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='480' height='640'><rect width='100%' height='100%' fill='%23111118'/><text x='50%' y='50%' fill='%23ffffff' font-size='20' font-family='Arial' text-anchor='middle'>Affiche</text></svg>";
+
   return (
     <m.article
       variants={fadeUp}
@@ -245,24 +284,27 @@ function PosterCard({ p, i }) {
       className="group relative rounded-2xl overflow-hidden bg-[#121219] ring-1 ring-white/10"
     >
       <div className="aspect-[3/4] relative">
-        <Image
-          src={p.img}
-          alt={p.title}
-          fill
-          sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
-          className="object-cover transition-transform duration-500 group-hover:scale-[1.04] will-change-transform"
-          priority={i < 2}
+        {/* Utilise <img> pour éviter la config remotePatterns pendant le dev */}
+        <img
+          src={f.poster_url || fallback}
+          alt={f.title}
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04] will-change-transform"
+          loading="lazy"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-70 group-hover:opacity-80 transition" />
       </div>
 
       <div className="absolute inset-0 p-4 flex flex-col justify-end">
-        <h3 className="font-semibold">{p.title}</h3>
-        <p className="text-xs text-white/70">{p.author}</p>
+        <h3 className="font-semibold">{f.title}</h3>
+        <p className="text-xs text-white/70">
+          {f.director}
+          {f.year ? ` • ${f.year}` : ""}{" "}
+          {f.runtime_min ? ` • ${f.runtime_min}’` : ""}
+        </p>
 
-        <div className="pt-3 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition">
+        <div className="pt-3 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition flex gap-2">
           <Link
-            href={p.href}
+            href={`/productions/${encodeURIComponent(f.slug)}`}
             className="inline-flex items-center rounded-xl px-4 py-2 text-sm font-semibold text-black"
             style={{
               background: "linear-gradient(90deg,#FFC119 0%, #FFEB83 100%)",
@@ -270,6 +312,16 @@ function PosterCard({ p, i }) {
           >
             Voir la fiche
           </Link>
+
+          {isAdmin && (
+            <Link
+              href={`/dashboard/films/${encodeURIComponent(f.id)}`}
+              className="inline-flex items-center rounded-xl px-4 py-2 text-sm font-semibold text-white bg-white/10 hover:bg-white/15 ring-1 ring-white/10"
+              title="Modifier (admin)"
+            >
+              Modifier
+            </Link>
+          )}
         </div>
       </div>
     </m.article>
