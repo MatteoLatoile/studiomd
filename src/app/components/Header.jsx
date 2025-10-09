@@ -420,10 +420,7 @@ export default function Header() {
                 />
               </summary>
               <div className="ml-4 mt-2 flex flex-col gap-2 text-sm">
-                <Link
-                  href="/services/location"
-                  onClick={() => setMenuOpen(false)}
-                >
+                <Link href="/location" onClick={() => setMenuOpen(false)}>
                   Location d'équipements
                 </Link>
                 <Link href="/productions" onClick={() => setMenuOpen(false)}>
