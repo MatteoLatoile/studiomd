@@ -241,7 +241,7 @@ export default function Header() {
                   <ul className="pt-3">
                     <li>
                       <Link
-                        href="/services/location"
+                        href="/location"
                         className={`flex items-center justify-between w-full px-3 py-2 rounded-xl ${tone.hoverSurface} text-sm transition ${dropdownItemText}`}
                       >
                         Location d'équipements{" "}

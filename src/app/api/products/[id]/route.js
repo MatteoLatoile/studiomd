@@ -2,8 +2,9 @@
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { supabaseAdmin } from "../../../lib/supabaseAdmin";
 
-export const dynamic = "force-dynamic"; // ✅ évite un cache qui varie selon l'état de connexion
+export const dynamic = "force-dynamic";
 
 function safeNumber(v, def = 0) {
   const n = parseFloat(String(v));
@@ -28,16 +29,10 @@ function parseTags(raw) {
     return [];
   }
 }
-
-/**
- * ✅ Normalise la valeur `tags` en TABLEAU DE STRINGS pour la réponse API.
- * (jsonb, text[], text, string JSON → toujours string[])
- */
 function normalizeTagsOut(raw) {
   if (!raw && raw !== "") return [];
-  if (Array.isArray(raw)) {
+  if (Array.isArray(raw))
     return raw.map((t) => String(t).trim()).filter(Boolean);
-  }
   if (typeof raw === "string" && raw.trim().startsWith("[")) {
     try {
       const arr = JSON.parse(raw);
@@ -56,7 +51,6 @@ function normalizeTagsOut(raw) {
     const parts = [];
     let current = "";
     let inQuotes = false;
-
     for (let i = 0; i < inner.length; i++) {
       const ch = inner[i];
       if (ch === '"') {
@@ -71,7 +65,6 @@ function normalizeTagsOut(raw) {
       current += ch;
     }
     if (current) parts.push(current);
-
     return parts
       .map((s) => s.replace(/^"(.*)"$/, "$1"))
       .map((s) => s.replace(/\\"/g, '"'))
@@ -80,41 +73,38 @@ function normalizeTagsOut(raw) {
   }
   if (typeof raw === "string") {
     const t = raw.trim();
-    if (!t) return [];
-    return [t];
+    return t ? [t] : [];
   }
   return [];
 }
-
 function normalizeProductOut(p) {
   if (!p) return p;
   return { ...p, tags: normalizeTagsOut(p.tags) };
 }
 
 export async function PUT(req, { params }) {
-  const supabase = createRouteHandlerClient({ cookies });
-
-  // Auth
+  // 1) Vérif auth (client user)
+  const supabaseUser = createRouteHandlerClient({ cookies });
   const {
     data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  } = await supabaseUser.auth.getUser();
+
+  if (!user)
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-  }
-  if (!user.app_metadata?.is_admin) {
+  if (!user.app_metadata?.is_admin)
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
-  }
 
   const id = params?.id;
   if (!id) return NextResponse.json({ error: "id manquant" }, { status: 400 });
 
   try {
-    // lire le produit existant (pour connaître l’ancienne image)
-    const { data: current, error: curErr } = await supabase
+    // 2) On lit avec admin (ou user — admin marche partout et évite RLS surprises)
+    const { data: current, error: curErr } = await supabaseAdmin
       .from("products")
-      .select("id, image_path, image_url")
+      .select("id, image_path, image_url, name")
       .eq("id", id)
       .single();
+
     if (curErr || !current) {
       return NextResponse.json(
         { error: curErr?.message || "Produit introuvable" },
@@ -137,7 +127,6 @@ export async function PUT(req, { params }) {
     const category = form.get("category");
     if (category !== null) update.category = String(category).trim();
 
-    // ✅ bloc STOCK
     const rawStock = form.get("stock");
     if (rawStock !== null) {
       const s = String(rawStock).trim();
@@ -147,31 +136,24 @@ export async function PUT(req, { params }) {
       }
     }
 
-    // Tags (reçus en JSON string) — IMPORTANT: on met à jour même si [].
-    if (form.has("tags")) {
-      const tags = parseTags(form.get("tags"));
-      update.tags = tags;
-    }
+    if (form.has("tags")) update.tags = parseTags(form.get("tags"));
 
-    // si une nouvelle image est fournie → upload + nettoyer l’ancienne
+    // Nouvelle image ?
     const imageFile = form.get("image");
     if (imageFile && imageFile.name) {
       const bucket = "products";
       const ext = imageFile.name.split(".").pop() || "jpg";
-      const base = sanitizeFilename(
-        update.name || current.image_path?.split("/").pop() || "image"
-      );
+      const base = sanitizeFilename(update.name || current.name || "image");
       const filename = `${Date.now()}_${base}.${ext}`;
       const path = `uploads/${filename}`;
 
-      const { error: upErr } = await supabase.storage
+      const { error: upErr } = await supabaseAdmin.storage
         .from(bucket)
         .upload(path, imageFile, {
           upsert: false,
           cacheControl: "3600",
           contentType: imageFile.type || "image/jpeg",
         });
-
       if (upErr) {
         return NextResponse.json(
           { error: `Échec upload image: ${upErr.message}` },
@@ -181,22 +163,22 @@ export async function PUT(req, { params }) {
 
       const {
         data: { publicUrl },
-      } = supabase.storage.from(bucket).getPublicUrl(path);
+      } = supabaseAdmin.storage.from(bucket).getPublicUrl(path);
 
       update.image_url = publicUrl;
       update.image_path = `${bucket}/${path}`;
 
-      // supprimer l’ancienne image si on en avait une
+      // Supprimer l’ancienne image (best effort)
       if (current.image_path) {
         const toRemove = current.image_path.replace(`${bucket}/`, "");
-        await supabase.storage
+        await supabaseAdmin.storage
           .from(bucket)
           .remove([toRemove])
           .catch(() => {});
       }
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("products")
       .update(update)
       .eq("id", id)
@@ -209,7 +191,6 @@ export async function PUT(req, { params }) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // ✅ normaliser les tags en sortie
     return NextResponse.json(
       { data: normalizeProductOut(data) },
       { status: 200 }
@@ -223,69 +204,62 @@ export async function PUT(req, { params }) {
 }
 
 export async function DELETE(_req, { params }) {
-  const supabase = createRouteHandlerClient({ cookies });
-
-  // Auth
+  // 1) Vérif auth
+  const supabaseUser = createRouteHandlerClient({ cookies });
   const {
     data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  } = await supabaseUser.auth.getUser();
+
+  if (!user)
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-  }
-  if (!user.app_metadata?.is_admin) {
+  if (!user.app_metadata?.is_admin)
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
-  }
 
   const id = params?.id;
   if (!id) return NextResponse.json({ error: "id manquant" }, { status: 400 });
 
   try {
-    // OPTION B : restreindre la suppression si le produit est référencé
-    const { data: refs, error: refsErr } = await supabase
+    // Références éventuelles (si tu veux bloquer la suppression)
+    const { error: refsErr, count } = await supabaseAdmin
       .from("order_items")
-      .select("id", { count: "exact", head: true })
+      .select("*", { count: "exact", head: true })
       .eq("product_id", id);
-
-    if (refsErr) {
+    if (refsErr)
       return NextResponse.json({ error: refsErr.message }, { status: 500 });
-    }
-    if ((refs?.length ?? 0) > 0) {
+    if ((count ?? 0) > 0) {
       return NextResponse.json(
         {
-          error:
-            "Suppression impossible : ce produit est présent dans au moins une commande.",
+          error: "Suppression impossible : produit présent dans une commande.",
         },
         { status: 409 }
       );
     }
 
-    // récupérer le chemin image pour la supprimer après
-    const { data: current, error: curErr } = await supabase
+    // Récup image_path pour supprimer le fichier ensuite
+    const { data: current, error: curErr } = await supabaseAdmin
       .from("products")
       .select("image_path")
       .eq("id", id)
       .single();
-    if (curErr) {
+    if (curErr)
       return NextResponse.json(
         { error: curErr.message || "Produit introuvable" },
         { status: 404 }
       );
-    }
 
-    // suppression DB
-    const { error: delErr } = await supabase
+    // Delete DB
+    const { error: delErr } = await supabaseAdmin
       .from("products")
       .delete()
       .eq("id", id);
-    if (delErr) {
+    if (delErr)
       return NextResponse.json({ error: delErr.message }, { status: 500 });
-    }
 
-    // suppression image (best effort)
+    // Delete fichier (best effort)
     if (current?.image_path) {
       const bucket = "products";
       const toRemove = current.image_path.replace(`${bucket}/`, "");
-      await supabase.storage
+      await supabaseAdmin.storage
         .from(bucket)
         .remove([toRemove])
         .catch(() => {});

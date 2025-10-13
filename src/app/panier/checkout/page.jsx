@@ -15,10 +15,9 @@ import {
   FiTruck,
   FiUser,
 } from "react-icons/fi";
-import CheckoutSteps from "../../components/CheckoutSteps";
 import { supabase } from "../../lib/supabase";
 
-/* utils */
+/* ---------- utils ---------- */
 function euro(n) {
   const v = Number(n || 0);
   return v.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
@@ -45,10 +44,11 @@ export default function CheckoutPage() {
   const router = useRouter();
 
   const [user, setUser] = useState(null);
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState([]); // { id, quantity, start_date, end_date, product:{ id,name,price,image_url,category } }
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  // coordonnées
   const [form, setForm] = useState({
     last_name: "",
     first_name: "",
@@ -56,16 +56,18 @@ export default function CheckoutPage() {
     phone: "",
   });
 
-  const [delivery, setDelivery] = useState("pickup");
+  // options
+  const [delivery, setDelivery] = useState("pickup"); // "pickup" | "delivery"
   const [address, setAddress] = useState({
     line1: "",
     line2: "",
     postal_code: "",
     city: "",
   });
-  const [payment, setPayment] = useState("card");
+  const [payment, setPayment] = useState("card"); // "card" | "bank"
   const [errors, setErrors] = useState({});
 
+  /* ---------- load user + panier + profil ---------- */
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -83,12 +85,18 @@ export default function CheckoutPage() {
       }
       setUser(currentUser);
 
+      // Panier avec DATES PAR ITEM
       const { data: cart, error: cartErr } = await supabase
         .from("cart_items")
         .select(
           `
-          id, quantity, start_date, end_date,
-          product:products(id, name, price, image_url, category)
+          id,
+          quantity,
+          start_date,
+          end_date,
+          product:products(
+            id, name, price, image_url, category
+          )
         `
         )
         .eq("user_id", currentUser.id)
@@ -103,6 +111,7 @@ export default function CheckoutPage() {
         setItems(cart || []);
       }
 
+      // Pré-remplir si table profiles existe
       const { data: prof } = await supabase
         .from("profiles")
         .select("first_name, last_name, phone")
@@ -125,6 +134,7 @@ export default function CheckoutPage() {
     };
   }, []);
 
+  /* ---------- totaux (par item) ---------- */
   const subtotal = useMemo(() => {
     return (items || []).reduce((s, it) => {
       const price = Number(it?.product?.price) || 0;
@@ -136,6 +146,7 @@ export default function CheckoutPage() {
   const tva = subtotal * 0.2;
   const total = subtotal + tva;
 
+  /* ---------- actions ---------- */
   function onChange(e) {
     const { name, value } = e.target;
     setForm((f) => ({ ...f, [name]: value }));
@@ -151,6 +162,7 @@ export default function CheckoutPage() {
     if (!form.first_name.trim()) err.first_name = "Prénom requis";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       err.email = "E-mail invalide";
+    // adresse si livraison
     if (delivery === "delivery") {
       if (!address.line1.trim()) err.line1 = "Adresse requise";
       if (!address.postal_code.trim()) err.postal_code = "Code postal requis";
@@ -159,6 +171,7 @@ export default function CheckoutPage() {
     return err;
   }
 
+  // Création de la session Stripe (les dates sont par item côté DB)
   async function onSubmit(e) {
     if (e?.preventDefault) e.preventDefault();
     const err = validate();
@@ -169,29 +182,25 @@ export default function CheckoutPage() {
 
     try {
       if (payment === "card") {
-        const res = await fetch("/api/cawl/create-session", {
+        const res = await fetch("/api/stripe/create-session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             delivery,
             address: delivery === "delivery" ? address : null,
-            first_name: form.first_name,
-            last_name: form.last_name,
-            email: form.email,
-            phone: form.phone,
           }),
         });
         const data = await res.json();
         if (!res.ok || !data?.url) {
           throw new Error(
-            data?.error || "Impossible de créer la session de paiement"
+            data?.error || "Impossible de créer la session Stripe"
           );
         }
-        window.location.href = data.url;
+        window.location.href = data.url; // redirection vers Stripe
         return;
       }
 
-      // virement
+      // Paiement par virement (fallback)
       const ref = "RES-" + Math.random().toString(36).slice(2, 8).toUpperCase();
       router.push(
         `/panier/checkout/confirmation?ref=${encodeURIComponent(ref)}`
@@ -204,13 +213,11 @@ export default function CheckoutPage() {
     }
   }
 
+  /* ---------- UI ---------- */
   if (loading) {
     return (
       <main className="bg-[#FFF5D7] min-h-screen py-30 px-4 md:px-8">
         <h1 className="text-3xl font-bold text-noir">Coordonnées</h1>
-        <div className="mt-4">
-          <CheckoutSteps step={2} />
-        </div>
         <div className="mt-6 grid md:grid-cols-[1fr_360px] gap-6">
           <div className="rounded-2xl bg-white/70 h-72 animate-pulse" />
           <div className="rounded-2xl bg-white/70 h-72 animate-pulse" />
@@ -223,9 +230,6 @@ export default function CheckoutPage() {
     return (
       <main className="bg-[#FFF5D7] min-h-screen py-30 px-4 md:px-8">
         <h1 className="text-3xl font-bold text-noir">Checkout</h1>
-        <div className="mt-4">
-          <CheckoutSteps step={2} />
-        </div>
         <div className="mt-6 rounded-2xl bg-[#ffffffb3] ring-1 ring-black/5 p-6 max-w-xl">
           <p className="text-noir">
             Connecte-toi pour finaliser ta réservation.
@@ -247,15 +251,14 @@ export default function CheckoutPage() {
   return (
     <main className="bg-[#FFF5D7] min-h-screen py-30 px-4 md:px-8">
       <h1 className="text-3xl font-bold text-noir">Coordonnées</h1>
-      <div className="mt-4">
-        <CheckoutSteps step={2} />
-      </div>
 
       <div className="mt-6 grid md:grid-cols-[1fr_360px] gap-6">
         {/* COL GAUCHE */}
         <section className="space-y-8">
+          {/* Carte coordonnées */}
           <div className="rounded-2xl bg-[#ffffffb3] ring-1 ring-black/5 p-4 sm:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
             <form className="space-y-4" onSubmit={onSubmit}>
+              {/* Nom & prénom */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field
                   icon={<FiUser className="text-[#FFB700]" />}
@@ -297,11 +300,13 @@ export default function CheckoutPage() {
                 placeholder="Numéro de téléphone"
               />
 
+              {/* Options & livraison */}
               <div className="pt-2 space-y-3">
                 <h2 className="text-xl font-bold text-noir">
                   Options & livraison
                 </h2>
 
+                {/* Retrait en agence */}
                 <label
                   className={[
                     "cursor-pointer rounded-xl p-3 bg-white ring-1 ring-black/10 flex items-start gap-3",
@@ -326,6 +331,7 @@ export default function CheckoutPage() {
                   </div>
                 </label>
 
+                {/* Livraison à l’adresse */}
                 <div
                   className={[
                     "rounded-xl text-noir bg-white ring-1 ring-black/10",
@@ -354,6 +360,7 @@ export default function CheckoutPage() {
                     </div>
                   </label>
 
+                  {/* Bloc adresse */}
                   <div
                     className={[
                       "grid grid-cols-1 sm:grid-cols-2 gap-3 px-3 pb-3 transition-all",
@@ -401,6 +408,7 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
+              {/* Paiement */}
               <div className="pt-1">
                 <h2 className="text-xl font-bold text-noir">Paiement</h2>
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -419,6 +427,7 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
+              {/* CTA mobile */}
               <div className="sm:hidden pt-3">
                 <button
                   type="submit"
@@ -436,12 +445,13 @@ export default function CheckoutPage() {
           </div>
         </section>
 
-        {/* COL DROITE */}
+        {/* COL DROITE : RÉCAP */}
         <aside className="rounded-2xl bg-[#ffffffb3] ring-1 ring-black/5 p-4 sm:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.06)] h-fit">
           <h3 className="text-lg font-semibold text-noir">
             Résumé de la commande
           </h3>
 
+          {/* Liste des produits */}
           <ul className="mt-4 space-y-3">
             {(items || []).map((it) => {
               const unit = Number(it?.product?.price) || 0;
@@ -485,6 +495,7 @@ export default function CheckoutPage() {
             })}
           </ul>
 
+          {/* Totaux */}
           <div className="mt-4 space-y-2 text-sm">
             <Row label="Sous-total" value={euro(subtotal)} />
             <Row label="TVA 20 %" value={euro(tva)} />
@@ -496,6 +507,9 @@ export default function CheckoutPage() {
             onClick={onSubmit}
             disabled={items.length === 0 || submitting}
             className="mt-5 w-full rounded-xl px-5 py-3 font-semibold text-noir shadow disabled:opacity-60"
+            style={{
+              background: "linear-gradient(90deg,#FFC119 0%, #FFEB83 100%)",
+            }}
           >
             {submitting ? "Validation…" : "Valider le paiement"}
           </button>
@@ -517,7 +531,7 @@ export default function CheckoutPage() {
   );
 }
 
-/* UI bits */
+/* ---------- petits composants ---------- */
 
 function Field({
   icon,
@@ -591,7 +605,7 @@ function RadioCard({ checked, onChange, title, icon }) {
     <label
       className={[
         "cursor-pointer text-noir rounded-xl p-3 bg-white ring-1 ring-black/10 flex items-center gap-3",
-        checked ? "outline-2 outline-[#FFB700]" : "",
+        checked ? " outline-2 outline-[#FFB700]" : "",
       ].join(" ")}
     >
       <input
