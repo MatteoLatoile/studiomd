@@ -1,349 +1,429 @@
-export const dynamic = "force-dynamic";
+// app/dashboard/page.jsx
+"use client";
 
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import DeleteContactMessageButton from "./DeleteContactMessageButton";
-import DeleteOrderButton from "./DeleteOrderButton";
-import OrderSearchBar from "./OrderSearchBar";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import {
+  FiArrowRight,
+  FiBox,
+  FiDownload,
+  FiFilm,
+  FiMail,
+  FiShoppingBag,
+  FiUsers,
+} from "react-icons/fi";
+import { supabase } from "../lib/supabase";
 
-/* ---------- utils ---------- */
-function formatDate(d) {
-  try {
-    return new Date(d).toLocaleString("fr-FR", {
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return d;
-  }
-}
-function euroCents(cents) {
-  const v = Number(cents || 0) / 100;
-  return v.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
-}
-function daysInclusive(a, b) {
-  try {
-    const d1 = new Date(a + "T00:00:00");
-    const d2 = new Date(b + "T00:00:00");
-    const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
-    return Math.max(1, diff + 1);
-  } catch {
-    return 1;
-  }
-}
+/* ---------------- UI bits ---------------- */
 
-export default async function DashboardPage({ searchParams }) {
-  const supabase = createServerComponentClient({ cookies });
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/connexion");
-  if (!user.app_metadata?.is_admin) redirect("/");
-
-  // COMMANDES
-  const { data: orders, error: ordersErr } = await supabase
-    .from("orders")
-    .select(
-      `
-      id,
-      user_id,
-      session_id,
-      start_date,
-      end_date,
-      delivery,
-      address,
-      payment_method,
-      total_amount_cents,
-      status,
-      created_at,
-      customer_email,
-      customer_first_name,
-      customer_last_name,
-      customer_phone,
-      items:order_items (
-        id,
-        product_id,
-        name,
-        unit_price_cents,
-        quantity
-      )
-    `
-    )
-    .order("created_at", { ascending: false });
-
-  const q = (searchParams?.q || "").toString().trim().toLowerCase();
-  const filteredOrders = !q
-    ? orders || []
-    : (orders || []).filter((o) => o.id.toLowerCase().includes(q));
-
-  // MESSAGES
-  const { data: messages, error: msgErr } = await supabase
-    .from("contact_messages")
-    .select("id, name, email, phone, subject, message, consent, created_at")
-    .order("created_at", { ascending: false });
-
+function Card({ children, className = "" }) {
   return (
-    <main className="px-20 py-30 bg-[#F6EAD1] mx-auto p-6">
-      <h1 className="text-3xl font-bold">Dashboard Admin</h1>
-      <p className="text-[#6B6B6B] mt-2">Bienvenue {user.email}.</p>
+    <div
+      className={
+        "rounded-2xl bg-[#0F0F14] ring-1 ring-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.25)] " +
+        className
+      }
+    >
+      {children}
+    </div>
+  );
+}
 
-      {/* ===== Commandes ===== */}
-      <section className="mt-8">
-        <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl font-semibold">Commandes clients</h2>
-            <span className="text-sm text-gray-600">
-              {ordersErr ? "Erreur" : filteredOrders.length} commande(s)
-            </span>
-          </div>
-          <OrderSearchBar />
-        </header>
+function StatCard({ icon, label, value, hint, href }) {
+  const content = (
+    <div className="p-5">
+      <div className="flex items-center gap-3">
+        <div className="h-10 w-10 grid place-items-center rounded-xl bg-white/5">
+          {icon}
+        </div>
+        <div className="flex-1">
+          <div className="text-sm text-white/60">{label}</div>
+          <div className="text-2xl font-extrabold tracking-tight">{value}</div>
+          {hint ? (
+            <div className="text-xs text-white/40 mt-1">{hint}</div>
+          ) : null}
+        </div>
+        {href ? (
+          <FiArrowRight className="text-white/60 group-hover:text-white transition" />
+        ) : null}
+      </div>
+    </div>
+  );
+  return href ? (
+    <Link
+      href={href}
+      className="group block rounded-2xl bg-[#0F0F14] ring-1 ring-white/10 hover:ring-white/20 transition"
+    >
+      {content}
+    </Link>
+  ) : (
+    <Card>{content}</Card>
+  );
+}
 
-        {ordersErr && (
-          <p className="text-red-600 mt-3">
-            Erreur commandes: {ordersErr.message}
+function Row({ label, children }) {
+  return (
+    <div className="grid grid-cols-[160px_1fr] gap-3 py-1.5">
+      <div className="text-white/60 text-sm">{label}</div>
+      <div className="text-white/95 text-sm">{children}</div>
+    </div>
+  );
+}
+
+function SkeletonLine({ w = "100%" }) {
+  return <div className="h-4 rounded bg-white/10" style={{ width: w }} />;
+}
+
+/* --------------- Page --------------- */
+
+export default function DashboardPage() {
+  const [user, setUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(true); // mets true si tu n’utilises pas la garde
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+
+  // Stats
+  const [counts, setCounts] = useState({
+    products: 0,
+    orders: 0,
+    films: 0,
+    subscribers: 0,
+    messages: 0,
+  });
+
+  // Dernières activités
+  const [lastOrders, setLastOrders] = useState([]);
+  const [lastSubs, setLastSubs] = useState([]);
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        setErr("");
+        // Auth (optionnel)
+        const { data } = await supabase.auth.getUser();
+        const u = data?.user || null;
+        if (!alive) return;
+        setUser(u);
+        // garde admin (décommente si tu veux forcer)
+        const admin = !!u?.app_metadata?.is_admin;
+        setIsAdmin(admin || true); // ← mets juste "admin" si tu veux bloquer l’accès aux non-admins
+
+        // Charge les stats (en parallèle)
+        const [
+          prodHead,
+          ordersHead,
+          filmsHead,
+          subsHead,
+          msgsHead,
+          lastOrdersQ,
+          lastSubsQ,
+        ] = await Promise.all([
+          supabase.from("products").select("*", { count: "exact", head: true }),
+          supabase.from("orders").select("*", { count: "exact", head: true }),
+          supabase.from("films").select("*", { count: "exact", head: true }),
+          supabase
+            .from("newsletter_subscribers")
+            .select("*", { count: "exact", head: true }),
+          supabase
+            .from("contact_messages")
+            .select("*", { count: "exact", head: true }),
+          supabase
+            .from("orders")
+            .select("id,total_amount_cents,status,created_at,customer_email")
+            .order("created_at", { ascending: false })
+            .limit(5),
+          supabase
+            .from("newsletter_subscribers")
+            .select("id,email,created_at")
+            .order("created_at", { ascending: false })
+            .limit(5),
+        ]);
+
+        if (!alive) return;
+
+        setCounts({
+          products: prodHead.count || 0,
+          orders: ordersHead.count || 0,
+          films: filmsHead.count || 0,
+          subscribers: subsHead.count || 0,
+          messages: msgsHead.count || 0,
+        });
+
+        setLastOrders(lastOrdersQ.data || []);
+        setLastSubs(lastSubsQ.data || []);
+      } catch (e) {
+        if (!alive) return;
+        setErr(e?.message || "Erreur au chargement du dashboard");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const actions = useMemo(
+    () => [
+      {
+        label: "Gérer les produits",
+        href: "/location",
+        desc: "Ajouter / modifier / supprimer (images & stock).",
+        icon: <FiBox className="text-xl text-white/80" />,
+      },
+      {
+        label: "Gérer les productions",
+        href: "/productions",
+        desc: "Films, affiches et détails.",
+        icon: <FiFilm className="text-xl text-white/80" />,
+      },
+      {
+        label: "Newsletter",
+        href: "/dashboard/newsletter",
+        desc: "Abonnés : recherche, export CSV.",
+        icon: <FiUsers className="text-xl text-white/80" />,
+      },
+    ],
+    []
+  );
+
+  if (!isAdmin) {
+    return (
+      <main className="min-h-screen bg-[#0A0A0D] text-white grid place-items-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold">Accès refusé</h1>
+          <p className="text-white/60 mt-2">
+            Cette page est réservée aux administrateurs.
           </p>
-        )}
-
-        <ul className="mt-4 space-y-4">
-          {!ordersErr && filteredOrders.length === 0 && (
-            <li className="rounded-2xl p-6 bg-[#ffffff80] ring-1 ring-black/5 text-sm text-gray-600">
-              {q
-                ? "Aucune commande ne correspond à la recherche."
-                : "Aucune commande pour le moment."}
-            </li>
-          )}
-
-          {filteredOrders.map((o) => (
-            <OrderCard key={o.id} order={o} />
-          ))}
-        </ul>
-      </section>
-
-      {/* ===== Messages ===== */}
-      <section className="mt-10">
-        <header className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Messages de contact</h2>
-          <span className="text-sm text-gray-600">
-            {msgErr ? "Erreur" : messages?.length || 0} message(s)
-          </span>
-        </header>
-
-        {msgErr && (
-          <p className="text-red-600 mt-3">Erreur messages: {msgErr.message}</p>
-        )}
-
-        <ul className="mt-4 space-y-4">
-          {!msgErr && (messages || []).length === 0 && (
-            <li className="rounded-2xl p-6 bg-[#ffffff80] ring-1 ring-black/5 text-sm text-gray-600">
-              Aucun message pour le moment.
-            </li>
-          )}
-
-          {(messages || []).map((m) => (
-            <MessageCard key={m.id} message={m} />
-          ))}
-        </ul>
-      </section>
-    </main>
-  );
-}
-
-function OrderCard({ order }) {
-  const days = daysInclusive(order.start_date, order.end_date);
-  const addr =
-    typeof order.address === "object" && order.address !== null
-      ? order.address
-      : {};
-
-  const deliveryLabel =
-    order.delivery === "delivery" ? "Livraison" : "Retrait agence";
-
-  const statusBadge = (() => {
-    const base =
-      "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ring-1";
-    switch (order.status) {
-      case "paid":
-        return `${base} bg-green-50 text-green-700 ring-green-200`;
-      case "pending":
-        return `${base} bg-yellow-50 text-yellow-700 ring-yellow-200`;
-      case "canceled":
-        return `${base} bg-red-50 text-red-700 ring-red-200`;
-      default:
-        return `${base} bg-gray-100 text-gray-700 ring-gray-200`;
-    }
-  })();
-
-  const fullName = [order.customer_first_name, order.customer_last_name]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
+          <Link
+            href="/"
+            className="inline-block mt-4 rounded-xl px-4 py-2 bg-white/10 hover:bg-white/15"
+          >
+            Retour à l’accueil
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <li className="rounded-2xl bg-[#ffffff80] ring-1 ring-black/5 shadow-[0_10px_30px_rgba(0,0,0,0.06)] p-5">
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-semibold text-noir text-base">
-              Commande #{order.id.slice(0, 8)}
-            </h3>
-            <span className={statusBadge}>{order.status}</span>
-            <span className="text-xs text-gray-500">
-              {formatDate(order.created_at)}
-            </span>
+    <main className="min-h-screen bg-[#0A0A0D] text-white">
+      <div className="mx-auto max-w-7xl px-4 md:px-8 pt-24 pb-16">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">
+              Dashboard
+            </h1>
+            <p className="text-white/60 mt-1 text-sm">
+              Vue d’ensemble du site : stats clés, raccourcis et dernières
+              activités.
+            </p>
           </div>
 
-          <div className="mt-1 text-sm text-[#343434]">
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="font-medium">Client:</span>
-              {fullName ? <span>{fullName}</span> : null}
-              {order.customer_email ? (
-                <a
-                  href={`mailto:${order.customer_email}`}
-                  className="text-blue-700 hover:underline break-all"
-                >
-                  {order.customer_email}
-                </a>
-              ) : null}
-              {order.customer_phone ? (
-                <a
-                  href={`tel:${order.customer_phone}`}
-                  className="text-gray-700 hover:underline"
-                >
-                  {order.customer_phone}
-                </a>
-              ) : null}
-              {!fullName && !order.customer_email && !order.customer_phone && (
-                <span className="text-gray-600">{order.user_id}</span>
-              )}
-            </p>
-
-            <p className="mt-0.5">
-              <span className="font-medium">Période:</span> {order.start_date} →{" "}
-              {order.end_date}{" "}
-              <span className="text-gray-600">
-                ({days} jour{days > 1 ? "s" : ""})
-              </span>
-            </p>
-
-            <p className="mt-0.5">
-              <span className="font-medium">Paiement:</span>{" "}
-              {order.payment_method === "card" ? "CB" : "Virement"}
-            </p>
-            <p className="mt-0.5">
-              <span className="font-medium">Mode:</span> {deliveryLabel}
-            </p>
-
-            {order.delivery === "delivery" && (
-              <div className="mt-1 text-sm text-gray-700">
-                {addr?.line1 && <div>{addr.line1}</div>}
-                {addr?.line2 && <div>{addr.line2}</div>}
-                {(addr?.postal_code || addr?.city) && (
-                  <div>
-                    {addr.postal_code || ""} {addr.city || ""}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="shrink-0 text-right">
-          <div className="text-sm text-gray-600">Total TTC</div>
-          <div className="text-lg font-semibold">
-            {euroCents(order.total_amount_cents)}
-          </div>
-
-          <div className="mt-3">
-            <DeleteOrderButton orderId={order.id} />
-          </div>
-        </div>
-      </div>
-
-      {/* Lignes */}
-      <div className="mt-4 rounded-xl bg-white ring-1 ring-black/5 p-3">
-        {(order.items || []).length === 0 ? (
-          <p className="text-sm text-gray-600">Aucun article.</p>
-        ) : (
-          <ul className="divide-y divide-black/5">
-            {order.items.map((it) => (
-              <li
-                key={it.id}
-                className="py-2 flex items-center justify-between"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-noir truncate">
-                    {it.name || it.product_id}
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    {it.quantity} unité{it.quantity > 1 ? "s" : ""} / jour ·{" "}
-                    {euroCents(it.unit_price_cents)}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </li>
-  );
-}
-
-function MessageCard({ message }) {
-  return (
-    <li className="rounded-2xl bg-[#ffffff80] ring-1 ring-black/5 shadow-[0_10px_30px_rgba(0,0,0,0.06)] p-5">
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-semibold text-noir text-base">
-              {message.name}
-            </h3>
+          <div className="flex items-center gap-2">
             <a
-              href={`mailto:${message.email}`}
-              className="text-sm text-blue-700 hover:underline"
+              href="/api/newsletter/export"
+              className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-black shadow"
+              style={{
+                background: "linear-gradient(90deg,#FFC119 0%, #FFEB83 100%)",
+              }}
+              title="Exporter les abonnés newsletter en CSV"
             >
-              {message.email}
+              <FiDownload />
+              Export CSV newsletter
             </a>
-            {message.phone && (
+            <Link
+              href="/"
+              className="rounded-xl px-4 py-2 text-sm bg-white/10 hover:bg-white/15"
+            >
+              ← Retour au site
+            </Link>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+          {loading ? (
+            <>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Card key={i} className="p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-white/10" />
+                    <div className="flex-1 space-y-2">
+                      <SkeletonLine w="40%" />
+                      <SkeletonLine w="60%" />
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </>
+          ) : (
+            <>
+              <StatCard
+                icon={<FiBox className="text-white/80 text-xl" />}
+                label="Produits"
+                value={counts.products}
+                hint="Catalogue location"
+                href="/location"
+              />
+              <StatCard
+                icon={<FiShoppingBag className="text-white/80 text-xl" />}
+                label="Commandes"
+                value={counts.orders}
+                hint="Total historique"
+                href="/panier"
+              />
+              <StatCard
+                icon={<FiFilm className="text-white/80 text-xl" />}
+                label="Films"
+                value={counts.films}
+                hint="Section productions"
+                href="/productions"
+              />
+              <StatCard
+                icon={<FiUsers className="text-white/80 text-xl" />}
+                label="Newsletter"
+                value={counts.subscribers}
+                hint="Abonnés actifs"
+                href="/dashboard/newsletter"
+              />
+              <StatCard
+                icon={<FiMail className="text-white/80 text-xl" />}
+                label="Messages"
+                value={counts.messages}
+                hint="Formulaire contact"
+              />
+            </>
+          )}
+        </div>
+
+        {/* Raccourcis */}
+        <div className="grid md:grid-cols-3 gap-4 mb-8">
+          {actions.map((a) => (
+            <Link
+              key={a.href}
+              href={a.href}
+              className="group rounded-2xl ring-1 ring-white/10 bg-[#0F0F14] p-5 hover:ring-white/20 transition"
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 grid place-items-center rounded-xl bg-white/5">
+                  {a.icon}
+                </div>
+                <div>
+                  <div className="font-semibold">{a.label}</div>
+                  <div className="text-sm text-white/60">{a.desc}</div>
+                </div>
+                <FiArrowRight className="ml-auto text-white/40 group-hover:text-white/80 transition" />
+              </div>
+            </Link>
+          ))}
+        </div>
+
+        {/* Deux colonnes : Dernières commandes / Derniers abonnés */}
+        <div className="grid lg:grid-cols-2 gap-6">
+          <Card>
+            <div className="p-5 border-b border-white/10">
+              <h2 className="text-lg font-semibold">Dernières commandes</h2>
+              <p className="text-white/60 text-sm">
+                5 plus récentes — statuts & montants
+              </p>
+            </div>
+            <div className="p-5">
+              {loading ? (
+                <div className="space-y-2">
+                  <SkeletonLine />
+                  <SkeletonLine w="90%" />
+                  <SkeletonLine w="80%" />
+                  <SkeletonLine w="70%" />
+                  <SkeletonLine w="60%" />
+                </div>
+              ) : lastOrders.length === 0 ? (
+                <p className="text-white/60 text-sm">Aucune commande.</p>
+              ) : (
+                <div className="divide-y divide-white/10">
+                  {lastOrders.map((o) => (
+                    <div key={o.id} className="py-3">
+                      <Row label="ID">{o.id}</Row>
+                      <Row label="Date">
+                        {new Date(o.created_at).toLocaleString()}
+                      </Row>
+                      <Row label="Montant">
+                        {(Number(o.total_amount_cents || 0) / 100).toFixed(2)} €
+                      </Row>
+                      <Row label="Statut">{o.status || "—"}</Row>
+                      <Row label="Client">{o.customer_email || "—"}</Row>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Card>
+
+          <Card>
+            <div className="p-5 border-b border-white/10 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">
+                  Derniers abonnés newsletter
+                </h2>
+                <p className="text-white/60 text-sm">
+                  5 plus récents — email & date
+                </p>
+              </div>
               <a
-                href={`tel:${message.phone}`}
-                className="text-sm text-gray-700 hover:underline"
+                href="/api/newsletter/export"
+                className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-black shadow"
+                style={{
+                  background: "linear-gradient(90deg,#FFC119 0%, #FFEB83 100%)",
+                }}
+                title="Exporter CSV"
               >
-                {message.phone}
+                <FiDownload />
+                Export
               </a>
-            )}
-          </div>
-
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-            {message.subject && (
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-white ring-1 ring-black/10">
-                {message.subject}
-              </span>
-            )}
-            <span className="text-gray-500">
-              {formatDate(message.created_at)}
-            </span>
-            {message.consent === false && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded bg-red-50 text-red-700 ring-1 ring-red-200">
-                sans consentement
-              </span>
-            )}
-          </div>
+            </div>
+            <div className="p-5">
+              {loading ? (
+                <div className="space-y-2">
+                  <SkeletonLine />
+                  <SkeletonLine w="90%" />
+                  <SkeletonLine w="80%" />
+                  <SkeletonLine w="70%" />
+                  <SkeletonLine w="60%" />
+                </div>
+              ) : lastSubs.length === 0 ? (
+                <p className="text-white/60 text-sm">Aucun abonné.</p>
+              ) : (
+                <div className="divide-y divide-white/10">
+                  {lastSubs.map((s) => (
+                    <div key={s.id} className="py-3">
+                      <Row label="Email">{s.email}</Row>
+                      <Row label="Inscrit le">
+                        {new Date(s.created_at).toLocaleString()}
+                      </Row>
+                      <Row label="ID">
+                        <span className="text-white/40 text-xs">{s.id}</span>
+                      </Row>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Card>
         </div>
 
-        <div className="mt-1">
-          <DeleteContactMessageButton id={message.id} />
-        </div>
+        {/* Footer mini info */}
+        {err && (
+          <p className="mt-6 text-red-400 text-sm">Erreur : {String(err)}</p>
+        )}
+        <p className="mt-6 text-xs text-white/40">
+          Tip : si des nombres restent à 0, vérifie les **politiques RLS** pour
+          permettre la lecture (SELECT) aux admins sur les tableaux concernés.
+        </p>
       </div>
-
-      <div className="mt-4 text-sm text-[#343434] whitespace-pre-line">
-        {message.message}
-      </div>
-    </li>
+    </main>
   );
 }

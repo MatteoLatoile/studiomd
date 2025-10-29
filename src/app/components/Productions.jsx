@@ -20,7 +20,7 @@ export default function Productions() {
     <LazyMotion features={domAnimation}>
       <section className="px-4 md:px-20 mt-32">
         <m.h3
-          className="text-3xl md:text-4xl font-bold tracking-tight text-[#000] mb-4"
+          className="text-3xl md:text-4xl font-bold tracking-tight text-[#fff] mb-4"
           variants={fadeUp}
           initial="hidden"
           whileInView="show"
