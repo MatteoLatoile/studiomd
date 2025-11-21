@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { stripe } from "../../../lib/stripe";
+import { computeDepositCents } from "../../../utils/deposit";
 
 /** nb de jours (inclusif) entre 2 dates ISO (YYYY-MM-DD) */
 function daysInclusive(a, b) {
@@ -31,13 +32,19 @@ export async function POST(req) {
       status: 400,
     });
 
-  // Session Stripe
-  const session = await stripe.checkout.sessions.retrieve(session_id);
+  // Session Stripe (+ expand pour récupérer le customer)
+  const session = await stripe.checkout.sessions.retrieve(session_id, {
+    expand: ["payment_intent"],
+  });
   if (!session || session.payment_status !== "paid") {
     return new Response(JSON.stringify({ error: "Paiement non confirmé" }), {
       status: 400,
     });
   }
+  const stripe_customer_id =
+    typeof session.customer === "string"
+      ? session.customer
+      : session.customer?.id || null;
 
   // Métadonnées
   const meta = session.metadata || {};
@@ -53,11 +60,12 @@ export async function POST(req) {
   const customer_last_name = meta.last_name || null;
   const customer_phone = meta.phone || session.customer_details?.phone || null;
 
-  // Panier (pour créer les lignes)
+  // Panier (pour créer les lignes + calculer la caution)
   const { data: cart, error: cartErr } = await supabase
     .from("cart_items")
     .select(
-      `id, quantity, start_date, end_date, product:products(id, name, price)`
+      `id, quantity, start_date, end_date,
+       product:products(id, name, price, require_deposit, deposit_type, deposit_amount_cents)`
     )
     .eq("user_id", user.id);
 
@@ -66,7 +74,6 @@ export async function POST(req) {
       status: 400,
     });
   }
-
   if (!cart || cart.length === 0) {
     return new Response(JSON.stringify({ error: "Panier vide" }), {
       status: 400,
@@ -83,6 +90,9 @@ export async function POST(req) {
       );
     }
   }
+
+  // 🧮 Caution exigée (en fonction des produits)
+  const deposit_required_cents = computeDepositCents(cart, startDate, endDate);
 
   // Crée la commande
   const { data: order, error: orderErr } = await supabase
@@ -101,6 +111,9 @@ export async function POST(req) {
       customer_first_name,
       customer_last_name,
       customer_phone,
+      stripe_customer_id, // ✅ on garde le lien vers Stripe
+      deposit_required_cents, // ✅ combien on devra bloquer
+      deposit_status: deposit_required_cents > 0 ? "pending" : "none", // état initial
     })
     .select()
     .single();

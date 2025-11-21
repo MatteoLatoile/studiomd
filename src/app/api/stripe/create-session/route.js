@@ -104,7 +104,7 @@ export async function POST(req) {
     process.env.NEXT_PUBLIC_SITE_URL ||
     "http://localhost:3000";
 
-  // Session Stripe
+  // ✅ On force la création de customer ET on sauvegarde la carte
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     payment_method_types: ["card"],
@@ -113,6 +113,10 @@ export async function POST(req) {
     success_url: `${origin}/panier/checkout/confirmation?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/panier/checkout`,
     customer_email,
+    customer_creation: "always",
+    payment_intent_data: {
+      setup_future_usage: "off_session",
+    },
     metadata: {
       user_id: user.id,
       start_date: startDate,

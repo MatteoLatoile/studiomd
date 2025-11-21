@@ -1,7 +1,7 @@
 "use client";
 
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
 import {
   FiArrowLeft,
   FiCheckCircle,
@@ -9,6 +9,7 @@ import {
   FiHome,
   FiLoader,
   FiPrinter,
+  FiShield,
 } from "react-icons/fi";
 
 function euro(cents) {
@@ -54,11 +55,22 @@ export default function ConfirmationPage() {
   const router = useRouter();
   const sessionId = search.get("session_id");
 
-  const [status, setStatus] = useState("pending");
+  const [status, setStatus] = useState("pending"); // pending | ok | error
   const [orderId, setOrderId] = useState(null);
   const [order, setOrder] = useState(null);
   const [err, setErr] = useState(null);
 
+  // État de la caution
+  const [depLoading, setDepLoading] = useState(false);
+  const [depError, setDepError] = useState("");
+  const [dep, setDep] = useState({
+    status: null, // none | pending_hold | authorized | captured | released | failed
+    payment_intent_id: null,
+    amount_cents: 0,
+    message: "",
+  });
+
+  // 1) Confirme la session Stripe -> crée/récupère la commande et renvoie order_id
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -93,6 +105,7 @@ export default function ConfirmationPage() {
     };
   }, [sessionId]);
 
+  // 2) Charge les détails de commande
   useEffect(() => {
     if (!orderId) return;
     let alive = true;
@@ -119,6 +132,44 @@ export default function ConfirmationPage() {
     };
   }, [orderId]);
 
+  // 3) Déclenche la caution dès qu'on a un orderId (1 seule fois)
+  useEffect(() => {
+    if (!orderId) return;
+    let alive = true;
+
+    (async () => {
+      try {
+        setDepLoading(true);
+        setDepError("");
+        const res = await fetch("/api/orders/deposit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ order_id: orderId }),
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!alive) return;
+
+        if (!res.ok) throw new Error(payload.error || "Échec de la caution");
+
+        setDep({
+          status: payload.deposit_status || "pending_hold",
+          payment_intent_id: payload.deposit_payment_id || null,
+          amount_cents: Number(payload.amount_cents || 0),
+          message: payload.message || "",
+        });
+      } catch (e) {
+        if (!alive) return;
+        setDepError(e.message || "Échec du traitement de la caution");
+      } finally {
+        if (alive) setDepLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [orderId]);
+
   const nbJours = useMemo(() => {
     if (!order?.start_date || !order?.end_date) return 1;
     const a = new Date(order.start_date + "T00:00:00");
@@ -136,66 +187,10 @@ export default function ConfirmationPage() {
 
   function printInvoice() {
     if (!order) return;
-    const {
-      id,
-      created_at,
-      start_date,
-      end_date,
-      customer_first_name,
-      customer_last_name,
-      customer_email,
-      customer_phone,
-      address,
-      items = [],
-      total_amount_cents = 0,
-    } = order;
-
-    const today = new Date().toLocaleDateString("fr-FR");
-    const name =
-      [customer_first_name, customer_last_name].filter(Boolean).join(" ") ||
-      customer_email ||
-      "Client";
-    const adr = asText(address);
-
-    const rows = items
-      .map(
-        (it, idx) => `
-        <tr class="${idx % 2 ? "zebra" : ""}">
-          <td class="col-item">
-            <div class="item-name">${escapeHtml(it.name || "Produit")}</div>
-            <div class="item-meta">Réservation ${nbJours} jour${
-          nbJours > 1 ? "s" : ""
-        }</div>
-          </td>
-          <td class="c">${Number(it.quantity) || 1}</td>
-          <td class="r">${euro(it.unit_price_cents)}</td>
-          <td class="r">${euro(
-            (Number(it.quantity) || 1) * (Number(it.unit_price_cents) || 0)
-          )}</td>
-        </tr>`
-      )
-      .join("");
-
-    const html = `<!doctype html>
-<html lang="fr">
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Facture ${escapeHtml(id)}</title>
-<style>/* (styles identiques à ta version) */</style>
-<body>... (identique à ta version envoyée) ...</body>
-</html>`;
-
-    const w = window.open("", "_blank", "noopener,noreferrer");
-    if (!w) return;
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-  }
-
-  function openInvoice() {
-    if (!orderId) return;
+    // (Tu as déjà la version "HTML complet" côté /api/orders/[id]?pdf=1)
+    // On garde ton bouton "Imprimer" qui ouvre la facture server-side.
     window.open(
-      `/api/orders/${orderId}?pdf=1`,
+      `/api/orders/${order.id}?pdf=1`,
       "_blank",
       "noopener,noreferrer"
     );
@@ -252,6 +247,62 @@ export default function ConfirmationPage() {
                       Référence commande&nbsp;:{" "}
                       <span className="font-mono">{asText(orderId)}</span>
                     </p>
+                  </div>
+                </div>
+
+                {/* ÉTAT CAUTION */}
+                <div className="rounded-2xl bg-white ring-1 ring-black/10 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="h-9 w-9 rounded-full bg-yellow-100 flex items-center justify-center">
+                      <FiShield className="text-yellow-700 text-lg" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold">
+                        Caution (empreinte bancaire)
+                      </p>
+                      {depLoading && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          Mise en place de l’empreinte en cours…
+                        </p>
+                      )}
+                      {!depLoading && depError && (
+                        <p className="text-sm text-red-600 mt-1">{depError}</p>
+                      )}
+                      {!depLoading && !depError && (
+                        <>
+                          {dep.message && (
+                            <p className="text-sm text-gray-700 mt-1">
+                              {dep.message}
+                            </p>
+                          )}
+                          {dep.amount_cents > 0 && (
+                            <p className="text-sm text-gray-700 mt-1">
+                              Montant bloqué&nbsp;:{" "}
+                              <strong>{euro(dep.amount_cents)}</strong>
+                            </p>
+                          )}
+                          {dep.status && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Statut&nbsp;: <em>{dep.status}</em>
+                              {dep.payment_intent_id ? (
+                                <>
+                                  {" "}
+                                  - PI:{" "}
+                                  <span className="font-mono">
+                                    {dep.payment_intent_id}
+                                  </span>
+                                </>
+                              ) : null}
+                            </p>
+                          )}
+                          {!dep.status && dep.amount_cents === 0 && (
+                            <p className="text-sm text-gray-700 mt-1">
+                              Aucune caution requise pour cette commande.
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 
